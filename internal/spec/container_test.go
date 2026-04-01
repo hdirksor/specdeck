@@ -1,0 +1,184 @@
+package spec_test
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/hdickson/specdeck/internal/spec"
+)
+
+func TestParseContainer_ImplicitDefault(t *testing.T) {
+	f := writeTempFile(t, `
+specs:
+  background-color: "#FFFFFF"
+  title: "Hello"
+`)
+	c, err := spec.ParseContainer(f)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(c.States) != 1 {
+		t.Fatalf("expected 1 state, got %d", len(c.States))
+	}
+	if c.States[0].Ref != "default" {
+		t.Errorf("expected ref 'default', got %q", c.States[0].Ref)
+	}
+	if v := c.States[0].Specs["background-color"].Value; v != "#FFFFFF" {
+		t.Errorf("expected background-color '#FFFFFF', got %v", v)
+	}
+}
+
+func TestParseContainer_VerboseSpec(t *testing.T) {
+	f := writeTempFile(t, `
+specs:
+  title:
+    value: "Hello"
+    description: "The main heading"
+`)
+	c, err := spec.ParseContainer(f)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	titleSpec := c.States[0].Specs["title"]
+	if titleSpec.Value != "Hello" {
+		t.Errorf("expected value 'Hello', got %v", titleSpec.Value)
+	}
+	if titleSpec.Description != "The main heading" {
+		t.Errorf("expected description 'The main heading', got %q", titleSpec.Description)
+	}
+}
+
+func TestParseContainer_ExplicitStates(t *testing.T) {
+	f := writeTempFile(t, `
+default: baseline
+states:
+  - ref: baseline
+    specs:
+      background-color: "#FFFFFF"
+  - ref: dark-mode
+    specs:
+      background-color: "#000000"
+`)
+	c, err := spec.ParseContainer(f)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if c.Default != "baseline" {
+		t.Errorf("expected default 'baseline', got %q", c.Default)
+	}
+	if len(c.States) != 2 {
+		t.Fatalf("expected 2 states, got %d", len(c.States))
+	}
+}
+
+func TestParseContainer_TopLevelSpecsFoldIntoNamedDefault(t *testing.T) {
+	f := writeTempFile(t, `
+default: baseline
+specs:
+  background-color: "#FFFFFF"
+states:
+  - ref: dark-mode
+    specs:
+      background-color: "#000000"
+`)
+	c, err := spec.ParseContainer(f)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// should have baseline (from top-level specs) + dark-mode
+	if len(c.States) != 2 {
+		t.Fatalf("expected 2 states, got %d", len(c.States))
+	}
+	var baseline *spec.StateSpec
+	for i := range c.States {
+		if c.States[i].Ref == "baseline" {
+			baseline = &c.States[i]
+		}
+	}
+	if baseline == nil {
+		t.Fatal("expected a 'baseline' state")
+	}
+	if v := baseline.Specs["background-color"].Value; v != "#FFFFFF" {
+		t.Errorf("expected background-color '#FFFFFF', got %v", v)
+	}
+}
+
+func TestParseContainer_Events(t *testing.T) {
+	f := writeTempFile(t, `
+states:
+  - ref: default
+    specs:
+      background-color: "#FFFFFF"
+    events:
+      on-tap:
+        action: navigate
+        destination: detail-screen
+      on-long-press: show-menu
+`)
+	c, err := spec.ParseContainer(f)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	events := c.States[0].Events
+	if len(events) != 2 {
+		t.Fatalf("expected 2 events, got %d", len(events))
+	}
+	if events["on-long-press"] != "show-menu" {
+		t.Errorf("expected on-long-press 'show-menu', got %v", events["on-long-press"])
+	}
+	tap, ok := events["on-tap"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected on-tap to be a map, got %T", events["on-tap"])
+	}
+	if tap["action"] != "navigate" {
+		t.Errorf("expected action 'navigate', got %v", tap["action"])
+	}
+}
+
+func TestParseContainer_EmptyEvents(t *testing.T) {
+	f := writeTempFile(t, `
+states:
+  - ref: default
+    specs:
+      background-color: "#FFFFFF"
+    events: {}
+`)
+	c, err := spec.ParseContainer(f)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(c.States[0].Events) != 0 {
+		t.Errorf("expected empty events, got %v", c.States[0].Events)
+	}
+}
+
+func TestLoadContainers(t *testing.T) {
+	dir := t.TempDir()
+
+	// leaf container
+	leaf := filepath.Join(dir, "app", "home-tab", "feed-screen")
+	if err := os.MkdirAll(leaf, 0755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(leaf, "post-card.yml"), `
+specs:
+  background-color: "#FFFFFF"
+`)
+
+	// non-leaf with index.yml
+	writeFile(t, filepath.Join(dir, "app", "index.yml"), `
+states:
+  - ref: default
+    specs:
+      font-family: "Inter"
+`)
+
+	containers, err := spec.LoadContainers(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(containers) != 2 {
+		t.Errorf("expected 2 containers, got %d", len(containers))
+	}
+}
