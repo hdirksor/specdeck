@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var addStateCmd = &cobra.Command{
+var stateCmd = &cobra.Command{
 	Use:   "state <name>",
 	Short: "Propagate a new state into all existing leaf containers",
 	Long: `Adds the named state to every leaf container that does not already have it,
@@ -16,13 +16,13 @@ copying the container's default specs as a starting point.
 
 The state must already be defined in states/ before running this command.
 
-Example: specdeck add state dark-mode`,
+Example: specdeck state dark-mode`,
 	Args: cobra.ExactArgs(1),
 	RunE: runAddState,
 }
 
 func init() {
-	addCmd.AddCommand(addStateCmd)
+	rootCmd.AddCommand(stateCmd)
 }
 
 func runAddState(cmd *cobra.Command, args []string) error {
