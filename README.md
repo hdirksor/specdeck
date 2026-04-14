@@ -153,26 +153,10 @@ Generates `states/generated.yml` from fact scopes. `cross` facts are fully carte
 
 Re-running overwrites `generated.yml` entirely. To override a generated state, define a state with the same name in any other file under `states/`.
 
-### `specdeck add container <path>`
-
-Scaffolds a new leaf container at the given path within `containers/`, creating intermediate directories as needed. All existing states are stubbed in with empty specs. Warns before creating intermediate directories that don't exist yet (`-y` to skip confirmation).
-
-```sh
-specdeck add container app/home-tab/feed-screen/post-card
-```
-
 ### `specdeck add state <name>`
 
 Propagates a named state into all existing leaf containers that don't already have it, copying each container's default specs as a starting point. The state must already be defined in `states/` before running this command.
 
 ```sh
 specdeck add state dark-mode
-```
-
-### `specdeck fill <path>`
-
-Copies the default state's specs into any states with empty specs in the given container. States that already have specs are left untouched. Run this after filling in a container's default specs.
-
-```sh
-specdeck fill app/home-tab/feed-screen/post-card
 ```
