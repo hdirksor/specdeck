@@ -13,8 +13,14 @@ type SpecValue struct {
 	Description string
 }
 
+type Import struct {
+	Ref  string
+	Line int
+}
+
 type StateSpec struct {
 	Ref    string
+	Line   int
 	Specs  map[string]SpecValue
 	Events map[string]interface{}
 }
@@ -24,13 +30,19 @@ type Container struct {
 	Path    string
 	Default string
 	States  []StateSpec
+	Imports []Import
 }
 
 // containerFile is the raw YAML structure for a container file.
 type containerFile struct {
-	Default string               `yaml:"default"`
-	Specs   map[string]yaml.Node `yaml:"specs"`
-	States  []containerStateRaw  `yaml:"states"`
+	Default    string               `yaml:"default"`
+	Specs      map[string]yaml.Node `yaml:"specs"`
+	States     []containerStateRaw  `yaml:"states"`
+	Containers []containerRef       `yaml:"containers"`
+}
+
+type containerRef struct {
+	Ref string `yaml:"$ref"`
 }
 
 type containerStateRaw struct {
@@ -45,8 +57,21 @@ func ParseContainer(path string) (Container, error) {
 		return Container{}, fmt.Errorf("reading container file: %w", err)
 	}
 
+	var root yaml.Node
+	if err := yaml.Unmarshal(data, &root); err != nil {
+		return Container{}, fmt.Errorf("parsing container file: %w", err)
+	}
+
+	if root.Kind != yaml.DocumentNode || len(root.Content) == 0 {
+		return Container{}, nil
+	}
+
+	doc := root.Content[0]
+	stateLines := sequenceKeyLines(doc, "states", "ref")
+	importLines := sequenceKeyLines(doc, "containers", "$ref")
+
 	var raw containerFile
-	if err := yaml.Unmarshal(data, &raw); err != nil {
+	if err := doc.Decode(&raw); err != nil {
 		return Container{}, fmt.Errorf("parsing container file: %w", err)
 	}
 
@@ -71,10 +96,54 @@ func ParseContainer(path string) (Container, error) {
 		if err != nil {
 			return Container{}, err
 		}
-		c.States = append(c.States, StateSpec{Ref: s.Ref, Specs: specs, Events: s.Events})
+		c.States = append(c.States, StateSpec{
+			Ref:    s.Ref,
+			Line:   stateLines[s.Ref],
+			Specs:  specs,
+			Events: s.Events,
+		})
+	}
+
+	for _, cr := range raw.Containers {
+		c.Imports = append(c.Imports, Import{
+			Ref:  cr.Ref,
+			Line: importLines[cr.Ref],
+		})
 	}
 
 	return c, nil
+}
+
+// sequenceKeyLines returns a map of value → line number for keyField entries
+// within the sequence identified by seqKey in a YAML mapping node.
+func sequenceKeyLines(doc *yaml.Node, seqKey, keyField string) map[string]int {
+	lines := map[string]int{}
+	if doc.Kind != yaml.MappingNode {
+		return lines
+	}
+	for i := 0; i+1 < len(doc.Content); i += 2 {
+		if doc.Content[i].Value != seqKey {
+			continue
+		}
+		seq := doc.Content[i+1]
+		if seq.Kind != yaml.SequenceNode {
+			break
+		}
+		for _, item := range seq.Content {
+			if item.Kind != yaml.MappingNode {
+				continue
+			}
+			for j := 0; j+1 < len(item.Content); j += 2 {
+				k := item.Content[j]
+				v := item.Content[j+1]
+				if k.Value == keyField {
+					lines[v.Value] = v.Line
+				}
+			}
+		}
+		break
+	}
+	return lines
 }
 
 // parseSpecMap handles both shorthand (scalar) and verbose (mapping) spec values.
@@ -132,15 +201,16 @@ func LoadContainers(root string) ([]Container, error) {
 			return nil
 		}
 
-		c, err := ParseContainer(path)
-		if err != nil {
-			return fmt.Errorf("parsing container %s: %w", path, err)
-		}
-
 		rel, err := filepath.Rel(root, path)
 		if err != nil {
 			return err
 		}
+
+		c, err := ParseContainer(path)
+		if err != nil {
+			return fmt.Errorf("parsing container %s: %w", rel, err)
+		}
+
 		c.Path = rel
 		containers = append(containers, c)
 		return nil

@@ -82,7 +82,7 @@ func LoadFacts(dir string) ([]Fact, error) {
 		}
 		fact, err := ParseFact(filepath.Join(dir, e.Name()))
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%s: %w", e.Name(), err)
 		}
 		facts = append(facts, fact)
 	}

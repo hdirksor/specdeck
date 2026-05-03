@@ -153,6 +153,89 @@ states:
 	}
 }
 
+func TestParseContainer_Imports(t *testing.T) {
+	f := writeTempFile(t, `
+specs:
+  title: Hello
+containers:
+  - $ref: './noteInput.yml'
+  - $ref: '../shared/hero.yml'
+`)
+	c, err := spec.ParseContainer(f)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(c.Imports) != 2 {
+		t.Fatalf("expected 2 imports, got %d", len(c.Imports))
+	}
+	if c.Imports[0].Ref != "./noteInput.yml" {
+		t.Errorf("expected './noteInput.yml', got %q", c.Imports[0].Ref)
+	}
+	if c.Imports[1].Ref != "../shared/hero.yml" {
+		t.Errorf("expected '../shared/hero.yml', got %q", c.Imports[1].Ref)
+	}
+}
+
+func TestParseContainer_StateLineNumbers(t *testing.T) {
+	f := writeTempFile(t, `states:
+  - ref: baseline
+    specs:
+      color: red
+  - ref: dark-mode
+    specs:
+      color: black
+`)
+	c, err := spec.ParseContainer(f)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(c.States) != 2 {
+		t.Fatalf("expected 2 states, got %d", len(c.States))
+	}
+	if c.States[0].Line == 0 {
+		t.Error("expected non-zero line for first state")
+	}
+	if c.States[1].Line <= c.States[0].Line {
+		t.Errorf("expected dark-mode line (%d) > baseline line (%d)", c.States[1].Line, c.States[0].Line)
+	}
+}
+
+func TestParseContainer_ImportLineNumbers(t *testing.T) {
+	f := writeTempFile(t, `specs:
+  title: Hello
+containers:
+  - $ref: './a.yml'
+  - $ref: './b.yml'
+`)
+	c, err := spec.ParseContainer(f)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(c.Imports) != 2 {
+		t.Fatalf("expected 2 imports, got %d", len(c.Imports))
+	}
+	if c.Imports[0].Line == 0 {
+		t.Error("expected non-zero line for first import")
+	}
+	if c.Imports[1].Line <= c.Imports[0].Line {
+		t.Errorf("expected second import line (%d) > first (%d)", c.Imports[1].Line, c.Imports[0].Line)
+	}
+}
+
+func TestParseContainer_NoImports(t *testing.T) {
+	f := writeTempFile(t, `
+specs:
+  title: Hello
+`)
+	c, err := spec.ParseContainer(f)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(c.Imports) != 0 {
+		t.Errorf("expected no imports, got %d", len(c.Imports))
+	}
+}
+
 func TestLoadContainers(t *testing.T) {
 	dir := t.TempDir()
 
