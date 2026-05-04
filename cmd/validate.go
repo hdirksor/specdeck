@@ -26,35 +26,68 @@ func runValidate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	var allErrs []spec.ValidationError
+
+	factsDir := filepath.Join(root, "states", "facts")
+	validFacts, factErrs := spec.ValidateFactFiles(factsDir)
+	for _, name := range validFacts {
+		fmt.Printf("\U0001F7E2  %s\n", filepath.Join("states", "facts", name))
+	}
+	for i := range factErrs {
+		factErrs[i].File = filepath.Join("states", "facts", factErrs[i].File)
+	}
+	allErrs = append(allErrs, factErrs...)
+
+	statesDir := filepath.Join(root, "states")
+	validStates, stateErrs := spec.ValidateStateFiles(statesDir)
+	for _, name := range validStates {
+		fmt.Printf("\U0001F7E2  %s\n", filepath.Join("states", name))
+	}
+	for i := range stateErrs {
+		stateErrs[i].File = filepath.Join("states", stateErrs[i].File)
+	}
+	allErrs = append(allErrs, stateErrs...)
+
 	containersRoot := filepath.Join(root, "containers")
 	containers, err := spec.LoadContainers(containersRoot)
 	if err != nil {
 		return fmt.Errorf("\U0001F7E5  %w", err)
 	}
 
-	errs := spec.ValidateImports(containersRoot, containers)
-	for i := range errs {
-		errs[i].File = filepath.Join("containers", errs[i].File)
+	containerErrs := spec.ValidateImports(containersRoot, containers)
+	for i := range containerErrs {
+		containerErrs[i].File = filepath.Join("containers", containerErrs[i].File)
 	}
-
-	errFiles := make(map[string]bool, len(errs))
-	for _, e := range errs {
-		errFiles[e.File] = true
+	containerErrFiles := make(map[string]bool, len(containerErrs))
+	for _, e := range containerErrs {
+		containerErrFiles[e.File] = true
 	}
-
 	for _, c := range containers {
 		path := filepath.Join("containers", c.Path)
-		if !errFiles[path] {
+		if !containerErrFiles[path] {
 			fmt.Printf("\U0001F7E2  %s\n", path)
 		}
 	}
+	allErrs = append(allErrs, containerErrs...)
 
-	for _, e := range errs {
+	if len(allErrs) == 0 {
+		facts, err := spec.LoadFacts(factsDir)
+		if err != nil {
+			return err
+		}
+		states, err := spec.LoadStates(statesDir)
+		if err != nil {
+			return err
+		}
+		allErrs = append(allErrs, spec.Validate(facts, states, containers)...)
+	}
+
+	for _, e := range allErrs {
 		printValidationError(e)
 	}
 
-	if len(errs) > 0 {
-		return fmt.Errorf("%d validation error(s)", len(errs))
+	if len(allErrs) > 0 {
+		return fmt.Errorf("%d validation error(s)", len(allErrs))
 	}
 	return nil
 }

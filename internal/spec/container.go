@@ -37,18 +37,11 @@ type Container struct {
 type containerFile struct {
 	Default    string               `yaml:"default"`
 	Specs      map[string]yaml.Node `yaml:"specs"`
-	States     []containerStateRaw  `yaml:"states"`
 	Containers []containerRef       `yaml:"containers"`
 }
 
 type containerRef struct {
 	Ref string `yaml:"$ref"`
-}
-
-type containerStateRaw struct {
-	Ref    string                 `yaml:"ref"`
-	Specs  map[string]yaml.Node   `yaml:"specs"`
-	Events map[string]interface{} `yaml:"events"`
 }
 
 func ParseContainer(path string) (Container, error) {
@@ -67,7 +60,6 @@ func ParseContainer(path string) (Container, error) {
 	}
 
 	doc := root.Content[0]
-	stateLines := sequenceKeyLines(doc, "states", "ref")
 	importLines := sequenceKeyLines(doc, "containers", "$ref")
 
 	var raw containerFile
@@ -91,17 +83,15 @@ func ParseContainer(path string) (Container, error) {
 		c.States = append(c.States, StateSpec{Ref: defaultRef, Specs: specs})
 	}
 
-	for _, s := range raw.States {
-		specs, err := parseSpecMap(s.Specs)
+	statesSeq := findSequenceNode(doc, "states")
+	for _, item := range statesSeq {
+		ss, err := parseStateSpecNode(item)
 		if err != nil {
 			return Container{}, err
 		}
-		c.States = append(c.States, StateSpec{
-			Ref:    s.Ref,
-			Line:   stateLines[s.Ref],
-			Specs:  specs,
-			Events: s.Events,
-		})
+		if ss.Ref != "" {
+			c.States = append(c.States, ss)
+		}
 	}
 
 	for _, cr := range raw.Containers {
@@ -112,6 +102,76 @@ func ParseContainer(path string) (Container, error) {
 	}
 
 	return c, nil
+}
+
+// findSequenceNode returns the content slice of a sequence node identified by key
+// within a YAML mapping node, or nil if not found.
+func findSequenceNode(doc *yaml.Node, key string) []*yaml.Node {
+	if doc.Kind != yaml.MappingNode {
+		return nil
+	}
+	for i := 0; i+1 < len(doc.Content); i += 2 {
+		if doc.Content[i].Value == key && doc.Content[i+1].Kind == yaml.SequenceNode {
+			return doc.Content[i+1].Content
+		}
+	}
+	return nil
+}
+
+// parseStateSpecNode parses a state entry from a YAML mapping node.
+// Supports two formats:
+//   - ref format:      `ref: state-name`
+//   - name-as-key:    `state-name:` (first key that is not a known metadata key)
+func parseStateSpecNode(node *yaml.Node) (StateSpec, error) {
+	if node.Kind != yaml.MappingNode {
+		return StateSpec{}, fmt.Errorf("expected state entry to be a mapping")
+	}
+
+	var ref string
+	var line int
+	var specsRaw map[string]yaml.Node
+	var events map[string]interface{}
+
+	// Check for explicit `ref` key first.
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		if node.Content[i].Value == "ref" {
+			ref = node.Content[i+1].Value
+			line = node.Content[i+1].Line
+			break
+		}
+	}
+
+	// Name-as-key format: first key that isn't a known metadata key is the state name.
+	if ref == "" && len(node.Content) >= 2 {
+		known := map[string]bool{"specs": true, "events": true, "behavior": true}
+		for i := 0; i+1 < len(node.Content); i += 2 {
+			if !known[node.Content[i].Value] {
+				ref = node.Content[i].Value
+				line = node.Content[i].Line
+				break
+			}
+		}
+	}
+
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		switch node.Content[i].Value {
+		case "specs":
+			if err := node.Content[i+1].Decode(&specsRaw); err != nil {
+				return StateSpec{}, fmt.Errorf("parsing specs: %w", err)
+			}
+		case "events":
+			if err := node.Content[i+1].Decode(&events); err != nil {
+				return StateSpec{}, fmt.Errorf("parsing events: %w", err)
+			}
+		}
+	}
+
+	specs, err := parseSpecMap(specsRaw)
+	if err != nil {
+		return StateSpec{}, err
+	}
+
+	return StateSpec{Ref: ref, Line: line, Specs: specs, Events: events}, nil
 }
 
 // sequenceKeyLines returns a map of value → line number for keyField entries
