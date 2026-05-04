@@ -12,13 +12,13 @@ import (
 var generateStatesCmd = &cobra.Command{
 	Use:   "states",
 	Short: "Generate states from fact scopes",
-	Long: `Generates states/generated.yml from facts defined in states/facts/.
+	Long: `Generates states/states.lock from facts defined in states/facts/.
 
 Facts with scope "cross" are fully cartesian-producted together.
 Facts with scope "isolated" each contribute one state per non-default value.
 Facts with scope "manual" (the default) are ignored.
 
-Any state in generated.yml with the same name as a manually defined state
+Any state in states.lock with the same name as a manually defined state
 will be overridden by the manual definition.`,
 	RunE: runGenerateStates,
 }
@@ -44,12 +44,12 @@ func runGenerateStates(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	outPath := filepath.Join(projectRoot, "states", "generated.yml")
+	outPath := filepath.Join(projectRoot, "states", "states.lock")
 	if err := spec.WriteStates(outPath, states); err != nil {
 		return err
 	}
 
-	fmt.Printf("Generated %d states → states/generated.yml\n", len(states))
+	fmt.Printf("Generated %d states → states/states.lock\n", len(states))
 	for _, s := range states {
 		fmt.Printf("  %s\n", s.Name)
 	}

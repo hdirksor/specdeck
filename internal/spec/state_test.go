@@ -78,7 +78,7 @@ func TestLoadStates(t *testing.T) {
 
 func TestLoadStates_ManualStateOverridesGenerated(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "generated.yml"), `
+	writeFile(t, filepath.Join(dir, "states.lock"), `
 - name: default
   summary: Generated default
   facts: {}
@@ -102,7 +102,7 @@ func TestLoadStates_ManualStateOverridesGenerated(t *testing.T) {
 
 func TestLoadStates_GeneratedStatesIncludedWhenNoOverride(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "generated.yml"), `
+	writeFile(t, filepath.Join(dir, "states.lock"), `
 - name: default
   summary: Generated default
   facts: {}

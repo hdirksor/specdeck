@@ -46,6 +46,46 @@ func Validate(facts []Fact, states []State, containers []Container) []Validation
 	return errs
 }
 
+// ValidateFactFiles parses every .yml file in dir and returns one ValidationError per invalid file.
+// validFiles contains the names of files that parsed successfully.
+func ValidateFactFiles(dir string) (validFiles []string, errs []ValidationError) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, []ValidationError{{Message: err.Error()}}
+	}
+	for _, e := range entries {
+		if e.IsDir() || filepath.Ext(e.Name()) != ".yml" {
+			continue
+		}
+		if _, parseErr := ParseFacts(filepath.Join(dir, e.Name())); parseErr != nil {
+			errs = append(errs, ValidationError{File: e.Name(), Message: parseErr.Error()})
+		} else {
+			validFiles = append(validFiles, e.Name())
+		}
+	}
+	return validFiles, errs
+}
+
+// ValidateStateFiles parses every .yml file in dir and returns one ValidationError per invalid file.
+// validFiles contains the names of files that parsed successfully.
+func ValidateStateFiles(dir string) (validFiles []string, errs []ValidationError) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, []ValidationError{{Message: err.Error()}}
+	}
+	for _, e := range entries {
+		if e.IsDir() || filepath.Ext(e.Name()) != ".yml" {
+			continue
+		}
+		if _, err := ParseStates(filepath.Join(dir, e.Name())); err != nil {
+			errs = append(errs, ValidationError{File: e.Name(), Message: err.Error()})
+		} else {
+			validFiles = append(validFiles, e.Name())
+		}
+	}
+	return validFiles, errs
+}
+
 // ValidateImports checks that every $ref in each container resolves to an existing file.
 // Paths are resolved relative to the container file's directory within containersRoot.
 func ValidateImports(containersRoot string, containers []Container) []ValidationError {
