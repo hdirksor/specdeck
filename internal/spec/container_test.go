@@ -236,6 +236,76 @@ specs:
 	}
 }
 
+func TestParseContainer_TopLevelEvents(t *testing.T) {
+	f := writeTempFile(t, `
+events:
+  - title: on-press-enter
+    description: user presses enter
+    actions:
+      navigate:
+        destination: /jot/tags
+`)
+	c, err := spec.ParseContainer(f)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(c.Events) != 1 {
+		t.Fatalf("expected 1 event, got %d", len(c.Events))
+	}
+	ev := c.Events[0]
+	if ev.Title != "on-press-enter" {
+		t.Errorf("title: want 'on-press-enter', got %q", ev.Title)
+	}
+	if ev.Description != "user presses enter" {
+		t.Errorf("description: want 'user presses enter', got %q", ev.Description)
+	}
+	if ev.Actions["navigate"]["destination"] != "/jot/tags" {
+		t.Errorf("navigate.destination: want '/jot/tags', got %v", ev.Actions["navigate"]["destination"])
+	}
+}
+
+func TestParseContainer_TopLevelEvents_MultipleActions(t *testing.T) {
+	f := writeTempFile(t, `
+events:
+  - title: on-press-enter
+    actions:
+      navigate:
+        destination: /jot/tags
+      track:
+        event: note_submitted
+`)
+	c, err := spec.ParseContainer(f)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	ev := c.Events[0]
+	if len(ev.Actions) != 2 {
+		t.Fatalf("expected 2 actions, got %d", len(ev.Actions))
+	}
+	if ev.Actions["track"]["event"] != "note_submitted" {
+		t.Errorf("track.event: want 'note_submitted', got %v", ev.Actions["track"]["event"])
+	}
+}
+
+func TestParseContainer_TopLevelEvents_NoPayload(t *testing.T) {
+	f := writeTempFile(t, `
+events:
+  - title: on-dismiss
+    actions:
+      dismiss:
+`)
+	c, err := spec.ParseContainer(f)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(c.Events) != 1 {
+		t.Fatalf("expected 1 event, got %d", len(c.Events))
+	}
+	if _, ok := c.Events[0].Actions["dismiss"]; !ok {
+		t.Error("expected 'dismiss' action to be present")
+	}
+}
+
 func TestLoadContainers(t *testing.T) {
 	dir := t.TempDir()
 
