@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -14,8 +15,9 @@ type SpecValue struct {
 }
 
 type Import struct {
-	Ref  string
-	Line int
+	Ref       string
+	Line      int
+	Overrides map[string]SpecValue
 }
 
 type StateSpec struct {
@@ -25,19 +27,42 @@ type StateSpec struct {
 	Events map[string]interface{}
 }
 
+// Action holds the payload fields for a single action type.
+type Action map[string]interface{}
+
+// Event is a top-level interaction on a container: a trigger name, optional
+// description, and one or more typed actions.
+type Event struct {
+	Title       string
+	Description string
+	Actions     map[string]Action
+}
+
 type Container struct {
 	// Path is relative to the containers/ root directory.
-	Path    string
-	Default string
-	States  []StateSpec
-	Imports []Import
+	Path        string
+	Title       string
+	Description string
+	Default     string
+	States      []StateSpec
+	Imports     []Import
+	Events      []Event
 }
 
 // containerFile is the raw YAML structure for a container file.
 type containerFile struct {
-	Default    string               `yaml:"default"`
-	Specs      map[string]yaml.Node `yaml:"specs"`
-	Containers []containerRef       `yaml:"containers"`
+	Title       string               `yaml:"title"`
+	Description string               `yaml:"description"`
+	Default     string               `yaml:"default"`
+	Specs       map[string]yaml.Node `yaml:"specs"`
+	Containers  []containerRef       `yaml:"containers"`
+	Events      []eventFile          `yaml:"events"`
+}
+
+type eventFile struct {
+	Title       string            `yaml:"title"`
+	Description string            `yaml:"description"`
+	Actions     map[string]Action `yaml:"actions"`
 }
 
 type containerRef struct {
@@ -60,7 +85,6 @@ func ParseContainer(path string) (Container, error) {
 	}
 
 	doc := root.Content[0]
-	importLines := sequenceKeyLines(doc, "containers", "$ref")
 
 	var raw containerFile
 	if err := doc.Decode(&raw); err != nil {
@@ -72,7 +96,12 @@ func ParseContainer(path string) (Container, error) {
 		defaultRef = raw.Default
 	}
 
-	c := Container{Default: defaultRef}
+	title := raw.Title
+	if title == "" {
+		title = strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	}
+
+	c := Container{Default: defaultRef, Title: title, Description: raw.Description}
 
 	// Top-level specs fold into the default state.
 	if len(raw.Specs) > 0 {
@@ -94,10 +123,17 @@ func ParseContainer(path string) (Container, error) {
 		}
 	}
 
-	for _, cr := range raw.Containers {
-		c.Imports = append(c.Imports, Import{
-			Ref:  cr.Ref,
-			Line: importLines[cr.Ref],
+	imports, err := parseContainerImports(doc)
+	if err != nil {
+		return Container{}, err
+	}
+	c.Imports = imports
+
+	for _, ef := range raw.Events {
+		c.Events = append(c.Events, Event{
+			Title:       ef.Title,
+			Description: ef.Description,
+			Actions:     ef.Actions,
 		})
 	}
 
@@ -174,36 +210,56 @@ func parseStateSpecNode(node *yaml.Node) (StateSpec, error) {
 	return StateSpec{Ref: ref, Line: line, Specs: specs, Events: events}, nil
 }
 
-// sequenceKeyLines returns a map of value → line number for keyField entries
-// within the sequence identified by seqKey in a YAML mapping node.
-func sequenceKeyLines(doc *yaml.Node, seqKey, keyField string) map[string]int {
-	lines := map[string]int{}
+// parseContainerImports extracts Import entries from the "containers" sequence
+// of a YAML mapping node. Keys other than "$ref" in each entry are treated as
+// spec overrides applied when the import is resolved.
+func parseContainerImports(doc *yaml.Node) ([]Import, error) {
 	if doc.Kind != yaml.MappingNode {
-		return lines
+		return nil, nil
 	}
 	for i := 0; i+1 < len(doc.Content); i += 2 {
-		if doc.Content[i].Value != seqKey {
+		if doc.Content[i].Value != "containers" {
 			continue
 		}
 		seq := doc.Content[i+1]
 		if seq.Kind != yaml.SequenceNode {
 			break
 		}
+		var imports []Import
 		for _, item := range seq.Content {
 			if item.Kind != yaml.MappingNode {
 				continue
 			}
+			var imp Import
+			var overrideNodes map[string]yaml.Node
 			for j := 0; j+1 < len(item.Content); j += 2 {
-				k := item.Content[j]
+				k := item.Content[j].Value
 				v := item.Content[j+1]
-				if k.Value == keyField {
-					lines[v.Value] = v.Line
+				if k == "$ref" {
+					imp.Ref = v.Value
+					imp.Line = v.Line
+				} else {
+					if overrideNodes == nil {
+						overrideNodes = make(map[string]yaml.Node)
+					}
+					overrideNodes[k] = *v
 				}
 			}
+			if imp.Ref == "" {
+				continue
+			}
+			if len(overrideNodes) > 0 {
+				specs, err := parseSpecMap(overrideNodes)
+				if err != nil {
+					return nil, fmt.Errorf("parsing overrides for %s: %w", imp.Ref, err)
+				}
+				imp.Overrides = specs
+			}
+			imports = append(imports, imp)
 		}
-		break
+		return imports, nil
 	}
-	return lines
+	return nil, nil
 }
 
 // parseSpecMap handles both shorthand (scalar) and verbose (mapping) spec values.

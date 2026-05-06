@@ -141,6 +141,70 @@ specs:
   title-text: "Hello"
 ```
 
+#### Importing sub-containers
+
+A container can import other containers by reference. The built output groups each import as a named section, titled from the imported container's `title` field (falling back to the filename stem).
+
+```yaml
+# containers/jot/index.yml
+containers:
+  - $ref: '../shared/hero.yml'
+  - $ref: './noteInput.yml'
+```
+
+#### Events
+
+Containers declare the interactions they support under an `events:` key. Each event has a trigger name (`title`), an optional `description`, and one or more typed actions nested under `actions:`.
+
+```yaml
+events:
+  - title: on-press-enter
+    description: user presses enter
+    actions:
+      navigate:
+        destination: /jot/tags
+```
+
+Multiple actions per event are supported:
+
+```yaml
+events:
+  - title: on-press-submit
+    actions:
+      navigate:
+        destination: /home
+      track:
+        event: form_submitted
+```
+
+**Built-in action types**
+
+| Action | Purpose | Fields |
+|---|---|---|
+| `navigate` | route change | `destination` (required), `transition` (optional: `push` / `modal` / `replace`) |
+| `track` | analytics / logging | `event` (required), `properties` (optional map) |
+| `dispatch` | trigger a background job | `job` (required), `payload` (optional map) |
+| `update` | mutate local state | `target` (required), `value` (required) |
+| `open` | external URL or deep link | `url` (required) |
+| `dismiss` | close the current view | — |
+| `prompt` | show a dialog or alert | `message` (required), `confirm_action` (optional) |
+
+**Custom action types**
+
+Because the action key *is* the type, any string is a valid action type — there is no allowlist. Custom types pass through as-is and render alongside built-ins:
+
+```yaml
+events:
+  - title: on-press-enter
+    actions:
+      haptic:
+        pattern: heavy
+      navigate:
+        destination: /home
+```
+
+Teams can freely define a shared vocabulary of custom types (e.g. `haptic`, `toast`, `permission-request`) and use them consistently across containers. The payload fields are arbitrary — specdeck does not validate them for custom types.
+
 ## Commands
 
 ### `specdeck new [name]`
