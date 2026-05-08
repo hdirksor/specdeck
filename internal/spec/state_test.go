@@ -76,54 +76,6 @@ func TestLoadStates(t *testing.T) {
 	}
 }
 
-func TestLoadStates_ManualStateOverridesGenerated(t *testing.T) {
-	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "states.lock"), `
-- name: default
-  summary: Generated default
-  facts: {}
-`)
-	writeFile(t, filepath.Join(dir, "core.yml"), `
-- name: default
-  summary: Manual override
-  facts: {}
-`)
-	states, err := spec.LoadStates(dir)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(states) != 1 {
-		t.Fatalf("expected 1 state, got %d", len(states))
-	}
-	if states[0].Summary != "Manual override" {
-		t.Errorf("expected manual state to win, got summary %q", states[0].Summary)
-	}
-}
-
-func TestLoadStates_GeneratedStatesIncludedWhenNoOverride(t *testing.T) {
-	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "states.lock"), `
-- name: default
-  summary: Generated default
-  facts: {}
-- name: dark
-  summary: Generated dark
-  facts: {}
-`)
-	writeFile(t, filepath.Join(dir, "core.yml"), `
-- name: premium
-  summary: Manual premium
-  facts: {}
-`)
-	states, err := spec.LoadStates(dir)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(states) != 3 {
-		t.Errorf("expected 3 states, got %d", len(states))
-	}
-}
-
 func TestLoadStates_ErrorOnDuplicateAcrossFiles(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "a.yml"), `

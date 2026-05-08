@@ -49,12 +49,11 @@ func LoadStates(dir string) ([]State, error) {
 		return nil, fmt.Errorf("reading states directory: %w", err)
 	}
 
-	// Load manual files first; states.lock is loaded last and only fills gaps.
 	seen := make(map[string]bool)
 	var states []State
 
 	for _, e := range entries {
-		if e.IsDir() || filepath.Ext(e.Name()) != ".yml" || e.Name() == "states.lock" {
+		if e.IsDir() || filepath.Ext(e.Name()) != ".yml" {
 			continue
 		}
 		parsed, err := ParseStates(filepath.Join(dir, e.Name()))
@@ -67,20 +66,6 @@ func LoadStates(dir string) ([]State, error) {
 			}
 			seen[s.Name] = true
 			states = append(states, s)
-		}
-	}
-
-	generatedPath := filepath.Join(dir, "states.lock")
-	if _, err := os.Stat(generatedPath); err == nil {
-		generated, err := ParseStates(generatedPath)
-		if err != nil {
-			return nil, err
-		}
-		for _, s := range generated {
-			if !seen[s.Name] {
-				seen[s.Name] = true
-				states = append(states, s)
-			}
 		}
 	}
 

@@ -39,7 +39,6 @@ func New(dir, projectName string) error {
 func writeStarterFiles(dir string) error {
 	starterFact := `name: is-logged-in
 type: boolean
-scope: cross
 `
 	if err := os.WriteFile(filepath.Join(dir, "states", "facts", "is-logged-in.yml"), []byte(starterFact), 0644); err != nil {
 		return fmt.Errorf("writing starter fact: %w", err)

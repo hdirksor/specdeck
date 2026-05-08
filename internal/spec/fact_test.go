@@ -54,49 +54,6 @@ type: unknown
 	}
 }
 
-func TestParseFact_ScopeDefaultsToManual(t *testing.T) {
-	f := writeTempFile(t, `
-name: is-logged-in
-type: boolean
-`)
-	fact, err := spec.ParseFact(f)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if fact.Scope != spec.FactScopeManual {
-		t.Errorf("expected default scope manual, got %q", fact.Scope)
-	}
-}
-
-func TestParseFact_ScopeParsed(t *testing.T) {
-	f := writeTempFile(t, `
-name: theme
-type: enum
-values: [light, dark]
-scope: cross
-`)
-	fact, err := spec.ParseFact(f)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if fact.Scope != spec.FactScopeCross {
-		t.Errorf("expected scope cross, got %q", fact.Scope)
-	}
-}
-
-func TestParseFact_ErrorOnUnknownScope(t *testing.T) {
-	f := writeTempFile(t, `
-name: theme
-type: enum
-values: [light, dark]
-scope: unknown
-`)
-	_, err := spec.ParseFact(f)
-	if err == nil {
-		t.Fatal("expected error for unknown scope")
-	}
-}
-
 func TestParseFact_ErrorOnEnumWithNoValues(t *testing.T) {
 	f := writeTempFile(t, `
 name: language
