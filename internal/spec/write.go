@@ -33,28 +33,6 @@ func (s specValueOutput) MarshalYAML() (interface{}, error) {
 	}{s.Value, s.Description}, nil
 }
 
-func WriteStates(path string, states []State) error {
-	type stateOut struct {
-		Name    string                 `yaml:"name"`
-		Summary string                 `yaml:"summary"`
-		Facts   map[string]interface{} `yaml:"facts"`
-	}
-	out := make([]stateOut, len(states))
-	for i, s := range states {
-		out[i] = stateOut{Name: s.Name, Summary: s.Summary, Facts: s.Facts}
-	}
-
-	f, err := os.Create(path)
-	if err != nil {
-		return fmt.Errorf("creating states file: %w", err)
-	}
-	defer f.Close()
-
-	enc := yaml.NewEncoder(f)
-	enc.SetIndent(2)
-	return enc.Encode(out)
-}
-
 func WriteContainer(path string, c Container) error {
 	out := containerOutput{Default: c.Default}
 	for _, ss := range c.States {

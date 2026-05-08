@@ -15,26 +15,16 @@ const (
 	FactTypeEnum    FactType = "enum"
 )
 
-type FactScope string
-
-const (
-	FactScopeCross    FactScope = "cross"
-	FactScopeIsolated FactScope = "isolated"
-	FactScopeManual   FactScope = "manual"
-)
-
 type Fact struct {
 	Name   string
 	Type   FactType
 	Values []string
-	Scope  FactScope
 }
 
 type factFile struct {
-	Name   string    `yaml:"name"`
-	Type   FactType  `yaml:"type"`
-	Values []string  `yaml:"values"`
-	Scope  FactScope `yaml:"scope"`
+	Name   string   `yaml:"name"`
+	Type   FactType `yaml:"type"`
+	Values []string `yaml:"values"`
 }
 
 func validateFactFile(f factFile) (Fact, error) {
@@ -48,16 +38,7 @@ func validateFactFile(f factFile) (Fact, error) {
 		return Fact{}, fmt.Errorf("fact %q: unknown type %q (must be boolean or enum)", f.Name, f.Type)
 	}
 
-	scope := f.Scope
-	switch scope {
-	case FactScopeCross, FactScopeIsolated, FactScopeManual:
-	case "":
-		scope = FactScopeManual
-	default:
-		return Fact{}, fmt.Errorf("fact %q: unknown scope %q (must be cross, isolated, or manual)", f.Name, scope)
-	}
-
-	return Fact{Name: f.Name, Type: f.Type, Values: f.Values, Scope: scope}, nil
+	return Fact{Name: f.Name, Type: f.Type, Values: f.Values}, nil
 }
 
 // ParseFacts parses a fact file containing either a single fact (mapping) or
