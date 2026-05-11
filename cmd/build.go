@@ -40,9 +40,9 @@ func runBuild(cmd *cobra.Command, args []string) error {
 	distRoot := filepath.Join(root, "dist")
 
 	for _, c := range containers {
-		sections := spec.ResolveContainerSections(c, containersRoot, byPath)
+		ownStates, imports := spec.ResolveContainerSections(c, containersRoot, byPath)
 		outPath := filepath.Join(distRoot, c.Path)
-		if err := spec.WriteBuiltContainer(outPath, c, sections); err != nil {
+		if err := spec.WriteBuiltContainer(outPath, c, ownStates, imports); err != nil {
 			return fmt.Errorf("\U0001F7E5  %s: %w", c.Path, err)
 		}
 		fmt.Printf("\U0001F7E2  dist/%s\n", c.Path)
