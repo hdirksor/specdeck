@@ -42,35 +42,49 @@ specs:
 	c := loadFixture(t, root, "hero.yml")
 	byPath := map[string]spec.Container{"hero.yml": c}
 
-	sections := spec.ResolveContainerSections(c, root, byPath)
+	ownStates, imports := spec.ResolveContainerSections(c, root, byPath)
 
-	if len(sections) != 1 {
-		t.Fatalf("expected 1 section, got %d", len(sections))
+	if len(imports) != 0 {
+		t.Fatalf("expected no imports, got %d", len(imports))
 	}
-	if sections[0].Title != "Hero" {
-		t.Errorf("expected title 'Hero', got %q", sections[0].Title)
+	if len(ownStates) != 1 {
+		t.Fatalf("expected 1 state, got %d", len(ownStates))
 	}
-	if sections[0].Specs["headerText"].Value != "Hello" {
-		t.Errorf("unexpected spec value: %v", sections[0].Specs["headerText"])
+	if ownStates["default"]["headerText"].Value != "Hello" {
+		t.Errorf("unexpected spec value: %v", ownStates["default"]["headerText"])
 	}
 }
 
-func TestResolveContainerSections_TitleFallsBackToFilename(t *testing.T) {
+func TestResolveContainerSections_StateInheritance(t *testing.T) {
 	root := t.TempDir()
-	buildFixture(t, root, "noteInput.yml", `
+	buildFixture(t, root, "card.yml", `
+title: Card
 specs:
-  formLabelText: Notes
+  bgColor: white
+  textColor: black
+states:
+  - ref: dark
+    specs:
+      bgColor: "#1A1A1A"
 `)
-	c := loadFixture(t, root, "noteInput.yml")
-	byPath := map[string]spec.Container{"noteInput.yml": c}
+	c := loadFixture(t, root, "card.yml")
+	byPath := map[string]spec.Container{"card.yml": c}
 
-	sections := spec.ResolveContainerSections(c, root, byPath)
+	ownStates, _ := spec.ResolveContainerSections(c, root, byPath)
 
-	if len(sections) != 1 {
-		t.Fatalf("expected 1 section, got %d", len(sections))
+	if len(ownStates) != 2 {
+		t.Fatalf("expected 2 states, got %d", len(ownStates))
 	}
-	if sections[0].Title != "noteInput" {
-		t.Errorf("expected title 'noteInput', got %q", sections[0].Title)
+	// Default state unchanged.
+	if got := ownStates["default"]["bgColor"].Value; got != "white" {
+		t.Errorf("default bgColor: want 'white', got %q", got)
+	}
+	// Dark state overrides bgColor, inherits textColor.
+	if got := ownStates["dark"]["bgColor"].Value; got != "#1A1A1A" {
+		t.Errorf("dark bgColor: want '#1A1A1A', got %q", got)
+	}
+	if got := ownStates["dark"]["textColor"].Value; got != "black" {
+		t.Errorf("dark textColor: want 'black' (inherited), got %q", got)
 	}
 }
 
@@ -100,22 +114,25 @@ containers:
 		"jot/index.yml":     index,
 	}
 
-	sections := spec.ResolveContainerSections(index, root, byPath)
+	ownStates, imports := spec.ResolveContainerSections(index, root, byPath)
 
-	if len(sections) != 2 {
-		t.Fatalf("expected 2 sections, got %d", len(sections))
+	if len(ownStates) != 0 {
+		t.Fatalf("expected no own states, got %d", len(ownStates))
 	}
-	if sections[0].Title != "Hero" {
-		t.Errorf("section 0 title: want 'Hero', got %q", sections[0].Title)
+	if len(imports) != 2 {
+		t.Fatalf("expected 2 imports, got %d", len(imports))
 	}
-	if sections[0].Specs["headerText"].Value != "Hello" {
-		t.Errorf("section 0 specs: unexpected value %v", sections[0].Specs["headerText"])
+	if imports[0].Title != "Hero" {
+		t.Errorf("import 0 title: want 'Hero', got %q", imports[0].Title)
 	}
-	if sections[1].Title != "Note Input" {
-		t.Errorf("section 1 title: want 'Note Input', got %q", sections[1].Title)
+	if imports[0].States["default"]["headerText"].Value != "Hello" {
+		t.Errorf("import 0 specs: unexpected value %v", imports[0].States["default"]["headerText"])
 	}
-	if sections[1].Specs["formLabelText"].Value != "Notes" {
-		t.Errorf("section 1 specs: unexpected value %v", sections[1].Specs["formLabelText"])
+	if imports[1].Title != "Note Input" {
+		t.Errorf("import 1 title: want 'Note Input', got %q", imports[1].Title)
+	}
+	if imports[1].States["default"]["formLabelText"].Value != "Notes" {
+		t.Errorf("import 1 specs: unexpected value %v", imports[1].States["default"]["formLabelText"])
 	}
 }
 
@@ -140,79 +157,16 @@ containers:
 		"screen.yml":        screen,
 	}
 
-	sections := spec.ResolveContainerSections(screen, root, byPath)
+	ownStates, imports := spec.ResolveContainerSections(screen, root, byPath)
 
-	if len(sections) != 2 {
-		t.Fatalf("expected 2 sections, got %d", len(sections))
+	if ownStates["default"]["bgColor"].Value != "white" {
+		t.Errorf("own bgColor: want 'white', got %v", ownStates["default"]["bgColor"])
 	}
-	if sections[0].Title != "Screen" {
-		t.Errorf("section 0 (own) title: want 'Screen', got %q", sections[0].Title)
+	if len(imports) != 1 {
+		t.Fatalf("expected 1 import, got %d", len(imports))
 	}
-	if sections[0].Specs["bgColor"].Value != "white" {
-		t.Errorf("section 0 specs: unexpected value %v", sections[0].Specs["bgColor"])
-	}
-	if sections[1].Title != "Footer" {
-		t.Errorf("section 1 (import) title: want 'Footer', got %q", sections[1].Title)
-	}
-}
-
-func TestWriteBuiltContainer_Sections(t *testing.T) {
-	dir := t.TempDir()
-	outPath := filepath.Join(dir, "out.yml")
-
-	c := spec.Container{Title: "Jot", Description: "Note-taking screen"}
-	sections := []spec.Section{
-		{
-			Title: "Hero",
-			Specs: map[string]spec.SpecValue{"headerText": {Value: "░ jot"}},
-		},
-		{
-			Title: "Note Input",
-			Specs: map[string]spec.SpecValue{
-				"formLabelText": {Value: "Notes"},
-				"footerHelpText": {Value: "enter to submit", Description: "shown in footer"},
-			},
-		},
-	}
-
-	if err := spec.WriteBuiltContainer(outPath, c, sections); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	data, err := os.ReadFile(outPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var out struct {
-		Title       string `yaml:"title"`
-		Description string `yaml:"description"`
-		Sections    []struct {
-			Title string                 `yaml:"title"`
-			Specs map[string]interface{} `yaml:"specs"`
-		} `yaml:"containers"`
-	}
-	if err := yaml.Unmarshal(data, &out); err != nil {
-		t.Fatalf("parsing output: %v", err)
-	}
-
-	if out.Title != "Jot" {
-		t.Errorf("title: want 'Jot', got %q", out.Title)
-	}
-	if out.Description != "Note-taking screen" {
-		t.Errorf("description: want 'Note-taking screen', got %q", out.Description)
-	}
-	if len(out.Sections) != 2 {
-		t.Fatalf("expected 2 sections, got %d", len(out.Sections))
-	}
-	if out.Sections[0].Title != "Hero" {
-		t.Errorf("section 0 title: want 'Hero', got %q", out.Sections[0].Title)
-	}
-	if out.Sections[1].Title != "Note Input" {
-		t.Errorf("section 1 title: want 'Note Input', got %q", out.Sections[1].Title)
-	}
-	if out.Sections[1].Specs["footerHelpText"] == nil {
-		t.Error("expected footerHelpText in section 1 specs")
+	if imports[0].Title != "Footer" {
+		t.Errorf("import title: want 'Footer', got %q", imports[0].Title)
 	}
 }
 
@@ -236,15 +190,15 @@ containers:
 		"jot/index.yml":   index,
 	}
 
-	sections := spec.ResolveContainerSections(index, root, byPath)
+	_, imports := spec.ResolveContainerSections(index, root, byPath)
 
-	if len(sections) != 1 {
-		t.Fatalf("expected 1 section, got %d", len(sections))
+	if len(imports) != 1 {
+		t.Fatalf("expected 1 import, got %d", len(imports))
 	}
-	if got := sections[0].Specs["background-color"].Value; got != "blue" {
+	if got := imports[0].States["default"]["background-color"].Value; got != "blue" {
 		t.Errorf("background-color: want 'blue', got %q", got)
 	}
-	if got := sections[0].Specs["headerText"].Value; got != "Hello" {
+	if got := imports[0].States["default"]["headerText"].Value; got != "Hello" {
 		t.Errorf("headerText: want 'Hello', got %q", got)
 	}
 }
@@ -277,19 +231,85 @@ containers:
 		"jot/index.yml":     index,
 	}
 
-	sections := spec.ResolveContainerSections(index, root, byPath)
+	_, imports := spec.ResolveContainerSections(index, root, byPath)
 
-	if len(sections) != 1 {
-		t.Fatalf("expected 1 section, got %d", len(sections))
+	if len(imports) != 1 {
+		t.Fatalf("expected 1 import, got %d", len(imports))
 	}
-	if len(sections[0].Events) != 2 {
-		t.Fatalf("expected 2 events in section, got %d", len(sections[0].Events))
+	if len(imports[0].Events) != 2 {
+		t.Fatalf("expected 2 events, got %d", len(imports[0].Events))
 	}
-	if sections[0].Events[0].Title != "on-press-alt-e" {
-		t.Errorf("event 0 title: want 'on-press-alt-e', got %q", sections[0].Events[0].Title)
+	if imports[0].Events[0].Title != "on-press-alt-e" {
+		t.Errorf("event 0 title: want 'on-press-alt-e', got %q", imports[0].Events[0].Title)
 	}
-	if sections[0].Events[1].Title != "on-type-space-hash" {
-		t.Errorf("event 1 title: want 'on-type-space-hash', got %q", sections[0].Events[1].Title)
+	if imports[0].Events[1].Title != "on-type-space-hash" {
+		t.Errorf("event 1 title: want 'on-type-space-hash', got %q", imports[0].Events[1].Title)
+	}
+}
+
+func TestWriteBuiltContainer_Sections(t *testing.T) {
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "out.yml")
+
+	c := spec.Container{Title: "Jot", Description: "Note-taking screen"}
+	ownStates := map[string]map[string]spec.SpecValue{
+		"default": {"bgColor": {Value: "white"}},
+	}
+	imports := []spec.Section{
+		{
+			Title: "Note Input",
+			States: map[string]map[string]spec.SpecValue{
+				"default": {
+					"formLabelText":  {Value: "Notes"},
+					"footerHelpText": {Value: "enter to submit", Description: "shown in footer"},
+				},
+			},
+		},
+	}
+
+	if err := spec.WriteBuiltContainer(outPath, c, ownStates, imports); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var out struct {
+		Title       string `yaml:"title"`
+		Description string `yaml:"description"`
+		States      map[string]struct {
+			Specs map[string]interface{} `yaml:"specs"`
+		} `yaml:"states"`
+		Sections []struct {
+			Title  string `yaml:"title"`
+			States map[string]struct {
+				Specs map[string]interface{} `yaml:"specs"`
+			} `yaml:"states"`
+		} `yaml:"containers"`
+	}
+	if err := yaml.Unmarshal(data, &out); err != nil {
+		t.Fatalf("parsing output: %v", err)
+	}
+
+	if out.Title != "Jot" {
+		t.Errorf("title: want 'Jot', got %q", out.Title)
+	}
+	if out.Description != "Note-taking screen" {
+		t.Errorf("description: want 'Note-taking screen', got %q", out.Description)
+	}
+	if out.States["default"].Specs["bgColor"] != "white" {
+		t.Errorf("own default bgColor: want 'white', got %v", out.States["default"].Specs["bgColor"])
+	}
+	if len(out.Sections) != 1 {
+		t.Fatalf("expected 1 section, got %d", len(out.Sections))
+	}
+	if out.Sections[0].Title != "Note Input" {
+		t.Errorf("section title: want 'Note Input', got %q", out.Sections[0].Title)
+	}
+	if out.Sections[0].States["default"].Specs["footerHelpText"] == nil {
+		t.Error("expected footerHelpText in section default state")
 	}
 }
 
@@ -298,10 +318,12 @@ func TestWriteBuiltContainer_SectionEvents(t *testing.T) {
 	outPath := filepath.Join(dir, "out.yml")
 
 	c := spec.Container{Title: "Jot"}
-	sections := []spec.Section{
+	imports := []spec.Section{
 		{
 			Title: "Note Input",
-			Specs: map[string]spec.SpecValue{"formLabelText": {Value: "Notes"}},
+			States: map[string]map[string]spec.SpecValue{
+				"default": {"formLabelText": {Value: "Notes"}},
+			},
 			Events: []spec.Event{
 				{
 					Title: "on-press-alt-e",
@@ -313,7 +335,7 @@ func TestWriteBuiltContainer_SectionEvents(t *testing.T) {
 		},
 	}
 
-	if err := spec.WriteBuiltContainer(outPath, c, sections); err != nil {
+	if err := spec.WriteBuiltContainer(outPath, c, nil, imports); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -363,7 +385,7 @@ func TestWriteBuiltContainer_Events(t *testing.T) {
 		},
 	}
 
-	if err := spec.WriteBuiltContainer(outPath, c, nil); err != nil {
+	if err := spec.WriteBuiltContainer(outPath, c, nil, nil); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
