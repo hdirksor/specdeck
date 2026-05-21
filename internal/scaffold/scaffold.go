@@ -57,6 +57,42 @@ type: boolean
 		return fmt.Errorf("writing containers/.gitkeep: %w", err)
 	}
 
+	if err := os.MkdirAll(filepath.Join(dir, "changes"), 0755); err != nil {
+		return fmt.Errorf("creating changes directory: %w", err)
+	}
+
+	changeTemplate := `# Change title
+
+## What changed
+
+<!-- Describe what spec changes this PR introduces. -->
+
+## Why
+
+<!-- Motivation: user research, product decision, bug fix, etc. -->
+
+## References
+
+<!-- Ticket URL, Slack thread, stakeholder name, etc. -->
+`
+	if err := os.WriteFile(filepath.Join(dir, "changes", "TEMPLATE.md"), []byte(changeTemplate), 0644); err != nil {
+		return fmt.Errorf("writing changes/TEMPLATE.md: %w", err)
+	}
+
+	if err := os.MkdirAll(filepath.Join(dir, ".claude", "commands"), 0755); err != nil {
+		return fmt.Errorf("creating .claude/commands directory: %w", err)
+	}
+
+	changeSkill := `---
+description: Create a new change record for a spec change PR
+---
+
+Run ` + "`specdeck change new \"$ARGUMENTS\"`" + ` from the project root and report the created file path. Then open the file and invite the user to fill in the **What changed**, **Why**, and **References** sections — offer to draft content if the title gives enough context.
+`
+	if err := os.WriteFile(filepath.Join(dir, ".claude", "commands", "change.md"), []byte(changeSkill), 0644); err != nil {
+		return fmt.Errorf("writing .claude/commands/change.md: %w", err)
+	}
+
 	return nil
 }
 

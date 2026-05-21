@@ -47,6 +47,8 @@ func TestNew_CreatesExpectedStructure(t *testing.T) {
 		"states/facts/is-logged-in.yml",
 		"states/core.yml",
 		"containers/.gitkeep",
+		"changes/TEMPLATE.md",
+		".claude/commands/change.md",
 	} {
 		if _, err := os.Stat(filepath.Join(dir, entry)); os.IsNotExist(err) {
 			t.Errorf("expected %s to exist", entry)
@@ -66,6 +68,29 @@ func TestNew_DoesNotCreateExportsDir(t *testing.T) {
 
 	if _, err := os.Stat(filepath.Join(dir, "exports")); !os.IsNotExist(err) {
 		t.Error("exports directory should not be created by new")
+	}
+}
+
+func TestNew_ChangesTemplateHasExpectedSections(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".git"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := scaffold.New(dir, "myproject"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, "changes", "TEMPLATE.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	content := string(data)
+	for _, section := range []string{"## What changed", "## Why", "## References"} {
+		if !contains(content, section) {
+			t.Errorf("changes/TEMPLATE.md missing section %q", section)
+		}
 	}
 }
 
