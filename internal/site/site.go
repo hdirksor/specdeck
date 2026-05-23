@@ -83,7 +83,7 @@ func Prepare(distRoot, siteDir string, skip ...string) error {
 		if err := os.MkdirAll(filepath.Dir(stubPath), 0755); err != nil {
 			return err
 		}
-		stub := fmt.Sprintf("---\ntitle: %s\ndata_path: %s\n---\n", doc.Title, dataKey)
+		stub := fmt.Sprintf("---\ntitle: %s\ndata_path: %s\n---\n\n<!-- generated -->\n", doc.Title, dataKey)
 		return os.WriteFile(stubPath, []byte(stub), 0644)
 	})
 }
