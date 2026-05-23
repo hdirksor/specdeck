@@ -8,16 +8,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const skillsVersion = 2
-
 type config struct {
-	SpecsRepo     string `yaml:"specs_repo"`
-	SkillsVersion int    `yaml:"skills_version"`
+	SpecsRepo string `yaml:"specs_repo"`
 }
 
-const specifySkill = `Before doing anything else: read ` + "`specdeck.yml`" + `. If the ` + "`skills_version`" + ` field is missing or less than 2, stop and tell the user: "Your specdeck skills are out of date — run ` + "`specdeck sync`" + ` to update them, then retry."
-
-Read ` + "`specdeck.yml`" + ` in the project root to find the ` + "`specs_repo`" + ` path.
+const specifySkill = `Read ` + "`specdeck.yml`" + ` in the project root to find the ` + "`specs_repo`" + ` path.
 
 Look at $ARGUMENTS in the context of the current codebase — read relevant files, understand the feature's scope, boundaries, and how it fits with existing behaviour.
 
@@ -86,11 +81,11 @@ func writeConfig(dir, specsPath string) error {
 
 	enc := yaml.NewEncoder(f)
 	enc.SetIndent(2)
-	return enc.Encode(config{SpecsRepo: specsPath, SkillsVersion: skillsVersion})
+	return enc.Encode(config{SpecsRepo: specsPath})
 }
 
 func writeSkills(dir string) error {
-	commandsDir := filepath.Join(dir, ".claude", "commands")
+	commandsDir := filepath.Join(dir, ".claude", "commands", "specdeck")
 	if err := os.MkdirAll(commandsDir, 0755); err != nil {
 		return fmt.Errorf("creating .claude/commands: %w", err)
 	}

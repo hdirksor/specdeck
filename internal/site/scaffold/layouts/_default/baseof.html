@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ with .Title }}{{ . }} – {{ end }}{{ .Site.Title }}</title>
+  <link rel="stylesheet" href="{{ "style.css" | relURL }}">
+</head>
+<body>
+  <div class="layout">
+    <nav class="sidebar">
+      <a class="site-title" href="{{ "/" | relURL }}">{{ .Site.Title }}</a>
+      {{ range .Site.Sections }}
+      <div class="nav-section">
+        <span class="nav-section-title">{{ .Title }}</span>
+        <ul>
+          {{ range .Pages }}
+          <li><a href="{{ .Permalink }}" {{ if eq $.RelPermalink .RelPermalink }}class="active"{{ end }}>{{ .Title }}</a></li>
+          {{ end }}
+        </ul>
+      </div>
+      {{ end }}
+    </nav>
+    <main class="content">
+      {{ block "main" . }}{{ end }}
+    </main>
+  </div>
+</body>
+</html>

@@ -306,6 +306,28 @@ events:
 	}
 }
 
+func TestParseContainer_SequenceSpecs(t *testing.T) {
+	f := writeTempFile(t, `
+title: note list
+specs:
+  - behavior: list recently made notes with most recent at top
+  - border: 2px, white
+`)
+	c, err := spec.ParseContainer(f)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(c.States) != 1 {
+		t.Fatalf("expected 1 state, got %d", len(c.States))
+	}
+	if v := c.States[0].Specs["behavior"].Value; v != "list recently made notes with most recent at top" {
+		t.Errorf("behavior: got %v", v)
+	}
+	if v := c.States[0].Specs["border"].Value; v != "2px, white" {
+		t.Errorf("border: got %v", v)
+	}
+}
+
 func TestLoadContainers(t *testing.T) {
 	dir := t.TempDir()
 
