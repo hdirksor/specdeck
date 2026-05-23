@@ -1,0 +1,7 @@
+{{ range $name, $state := . }}
+<div class="state">
+  <h3>{{ $name }}</h3>
+  {{ with $state.specs }}{{ partial "specs-table.html" . }}{{ end }}
+  {{ with $state.events }}{{ partial "events.html" . }}{{ end }}
+</div>
+{{ end }}

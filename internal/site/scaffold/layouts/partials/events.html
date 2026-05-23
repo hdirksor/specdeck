@@ -1,0 +1,6 @@
+{{ range . }}
+<div class="event">
+  <strong>{{ .title }}</strong>
+  {{ with .description }}<p>{{ . }}</p>{{ end }}
+</div>
+{{ end }}

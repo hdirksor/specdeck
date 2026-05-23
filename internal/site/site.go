@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 //go:embed all:scaffold
@@ -36,31 +38,8 @@ func Bootstrap(siteDir string) error {
 	})
 }
 
-// Prepare writes content stubs into siteDir/content/containers/ from YAML in distRoot.
+// Prepare writes YAML into siteDir/data/containers/ and creates minimal content stubs.
 func Prepare(distRoot, siteDir string, skip ...string) error {
-	return writeContentStubs(distRoot, siteDir, skip...)
-}
-
-// Build generates a static site at siteOut using the Hugo project in siteDir.
-// Requires hugo to be installed and on PATH.
-func Build(distRoot, siteDir, siteOut string) error {
-	if err := Bootstrap(siteDir); err != nil {
-		return err
-	}
-	if err := Prepare(distRoot, siteDir, siteOut); err != nil {
-		return err
-	}
-
-	cmd := exec.Command("hugo", "--source", siteDir, "--destination", siteOut)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("hugo: %w", err)
-	}
-	return nil
-}
-
-func writeContentStubs(distRoot, siteDir string, skip ...string) error {
 	return filepath.WalkDir(distRoot, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -79,24 +58,59 @@ func writeContentStubs(distRoot, siteDir string, skip ...string) error {
 		if err != nil {
 			return err
 		}
+		base := strings.TrimSuffix(rel, ".yml")
+		dataKey := filepath.ToSlash(base)
 
-		rel = strings.TrimSuffix(rel, ".yml")
-		stubPath := filepath.Join(siteDir, "content", "containers", rel+".md")
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("reading %s: %w", path, err)
+		}
 
-		return writeContentStub(path, stubPath)
+		dataPath := filepath.Join(siteDir, "data", "containers", rel)
+		if err := os.MkdirAll(filepath.Dir(dataPath), 0755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(dataPath, raw, 0644); err != nil {
+			return err
+		}
+
+		var doc struct {
+			Title string `yaml:"title"`
+		}
+		yaml.Unmarshal(raw, &doc) //nolint:errcheck
+
+		stubPath := filepath.Join(siteDir, "content", "containers", base+".md")
+		if err := os.MkdirAll(filepath.Dir(stubPath), 0755); err != nil {
+			return err
+		}
+		stub := fmt.Sprintf("---\ntitle: %s\ndata_path: %s\n---\n", doc.Title, dataKey)
+		return os.WriteFile(stubPath, []byte(stub), 0644)
 	})
 }
 
-func writeContentStub(yamlPath, stubPath string) error {
-	yamlData, err := os.ReadFile(yamlPath)
-	if err != nil {
-		return fmt.Errorf("reading %s: %w", yamlPath, err)
-	}
-
-	if err := os.MkdirAll(filepath.Dir(stubPath), 0755); err != nil {
+// Build generates a static site at siteOut using the Hugo project in siteDir.
+// Requires hugo to be installed and on PATH.
+func Build(distRoot, siteDir, siteOut string) error {
+	if err := Bootstrap(siteDir); err != nil {
 		return err
 	}
-
-	content := "---\n" + string(yamlData) + "---\n"
-	return os.WriteFile(stubPath, []byte(content), 0644)
+	if err := Prepare(distRoot, siteDir, siteOut); err != nil {
+		return err
+	}
+	if _, err := os.Stat(filepath.Join(siteDir, "go.mod")); os.IsNotExist(err) {
+		cmd := exec.Command("hugo", "mod", "init", "specdeck-site")
+		cmd.Dir = siteDir
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("hugo mod init: %w", err)
+		}
+	}
+	cmd := exec.Command("hugo", "--source", siteDir, "--destination", siteOut)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("hugo: %w", err)
+	}
+	return nil
 }

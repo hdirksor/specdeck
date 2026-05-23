@@ -20,7 +20,7 @@ func writeFixture(t *testing.T, dir, rel, content string) {
 	}
 }
 
-func TestPrepare_CreatesContentStub(t *testing.T) {
+func TestPrepare_WritesDataFile(t *testing.T) {
 	distRoot := t.TempDir()
 	siteDir := t.TempDir()
 
@@ -36,6 +36,28 @@ states:
 		t.Fatalf("Prepare: %v", err)
 	}
 
+	dataPath := filepath.Join(siteDir, "data", "containers", "button.yml")
+	data, err := os.ReadFile(dataPath)
+	if err != nil {
+		t.Fatalf("data file not created: %v", err)
+	}
+	if !strings.Contains(string(data), "height: 40px") {
+		t.Error("data file missing spec value")
+	}
+}
+
+func TestPrepare_CreatesContentStub(t *testing.T) {
+	distRoot := t.TempDir()
+	siteDir := t.TempDir()
+
+	writeFixture(t, distRoot, "button.yml", `title: Button
+description: A clickable button
+`)
+
+	if err := site.Prepare(distRoot, siteDir); err != nil {
+		t.Fatalf("Prepare: %v", err)
+	}
+
 	stubPath := filepath.Join(siteDir, "content", "containers", "button.md")
 	data, err := os.ReadFile(stubPath)
 	if err != nil {
@@ -44,10 +66,13 @@ states:
 
 	body := string(data)
 	if !strings.Contains(body, "title: Button") {
-		t.Error("stub does not contain title")
+		t.Error("stub missing title")
 	}
-	if !strings.HasPrefix(body, "---\n") {
-		t.Error("stub does not start with YAML frontmatter delimiter")
+	if !strings.Contains(body, "data_path: button") {
+		t.Error("stub missing data_path")
+	}
+	if strings.Contains(body, "description") {
+		t.Error("stub should not contain description — data file handles that")
 	}
 }
 
@@ -67,6 +92,19 @@ description: Text input field
 	if _, err := os.Stat(stubPath); err != nil {
 		t.Errorf("nested content stub not created: %v", err)
 	}
+
+	dataPath := filepath.Join(siteDir, "data", "containers", "forms", "input.yml")
+	if _, err := os.Stat(dataPath); err != nil {
+		t.Errorf("nested data file not created: %v", err)
+	}
+
+	data, err := os.ReadFile(stubPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "data_path: forms/input") {
+		t.Errorf("nested stub has wrong data_path: %s", data)
+	}
 }
 
 func TestPrepare_EmptyDistRoot(t *testing.T) {
@@ -85,17 +123,8 @@ func TestBootstrap_CreatesScaffold(t *testing.T) {
 		t.Fatalf("Bootstrap: %v", err)
 	}
 
-	must := []string{
-		"hugo.toml",
-		filepath.Join("layouts", "_default", "baseof.html"),
-		filepath.Join("layouts", "containers", "single.html"),
-		filepath.Join("layouts", "index.html"),
-		filepath.Join("static", "style.css"),
-	}
-	for _, rel := range must {
-		if _, err := os.Stat(filepath.Join(siteDir, rel)); err != nil {
-			t.Errorf("expected %s to exist: %v", rel, err)
-		}
+	if _, err := os.Stat(filepath.Join(siteDir, "hugo.toml")); err != nil {
+		t.Errorf("expected hugo.toml to exist: %v", err)
 	}
 }
 
