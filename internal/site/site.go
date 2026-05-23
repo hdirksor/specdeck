@@ -112,5 +112,6 @@ func Build(distRoot, siteDir, siteOut string) error {
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("hugo: %w", err)
 	}
+
 	return nil
 }

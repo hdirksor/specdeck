@@ -1,4 +1,5 @@
 {{ define "main" }}
+<article class="markdown" data-pagefind-body>
 <h1>{{ .Site.Title }}</h1>
 {{ range .Site.Sections }}
 <section>
@@ -12,4 +13,5 @@
   </ul>
 </section>
 {{ end }}
+</article>
 {{ end }}

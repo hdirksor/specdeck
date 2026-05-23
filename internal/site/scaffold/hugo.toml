@@ -1,9 +1,10 @@
 baseURL = "/"
-languageCode = "en-us"
+locale = "en-us"
 title = "Spec Documentation"
 
 [params]
-  BookSearch = false
+  BookSearch   = false
+  BookSection  = "containers"
 
 [module]
   [[module.imports]]

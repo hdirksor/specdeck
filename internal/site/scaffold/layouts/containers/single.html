@@ -1,11 +1,10 @@
 {{ define "main" }}
-{{/* Traverse .Site.Data.containers using the slash-separated data_path from front matter */}}
-{{ $data := .Site.Data.containers }}
+{{ $data := hugo.Data.containers }}
 {{ range split .Params.data_path "/" }}
   {{ $data = index $data . }}
 {{ end }}
 
-<article class="container-page">
+<article class="markdown" data-pagefind-body>
   <h1>{{ $data.title }}</h1>
   {{ with $data.description }}<p class="description">{{ . }}</p>{{ end }}
 
