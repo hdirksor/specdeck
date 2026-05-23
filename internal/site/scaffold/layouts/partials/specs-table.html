@@ -5,13 +5,13 @@
   <tbody>
     {{ range $key, $val := . }}
     <tr>
-      <td class="spec-key">{{ $key }}</td>
+      <td><code>{{ $key }}</code></td>
       {{ if reflect.IsMap $val }}
-      <td class="spec-value">{{ index $val "value" }}</td>
-      <td class="spec-desc">{{ index $val "description" }}</td>
+      <td><code>{{ index $val "value" }}</code></td>
+      <td>{{ index $val "description" }}</td>
       {{ else }}
-      <td class="spec-value">{{ $val }}</td>
-      <td class="spec-desc"></td>
+      <td><code>{{ $val }}</code></td>
+      <td></td>
       {{ end }}
     </tr>
     {{ end }}

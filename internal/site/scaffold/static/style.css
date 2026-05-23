@@ -1,14 +1,5 @@
-/* Data-model overrides — book theme handles the rest */
-
-.spec-key, .spec-value { font-family: ui-monospace, "Cascadia Code", monospace; font-size: 13px; }
-.spec-value { color: var(--color-link, #0066cc); }
-.spec-desc { font-size: 13px; }
-
 .event {
   padding: 10px 12px;
-  border-left: 3px solid var(--color-border, #e2e2e2);
+  border-left: 3px solid #ccc;
   margin-bottom: 8px;
 }
-
-.event strong { font-size: 14px; }
-.event p { margin: 4px 0 0; font-size: 13px; }
