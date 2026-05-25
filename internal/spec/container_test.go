@@ -306,6 +306,56 @@ events:
 	}
 }
 
+func TestParseContainer_SequenceSpecs(t *testing.T) {
+	f := writeTempFile(t, `
+specs:
+  - border: 2dp white
+  - content-padding: 16dp on all sides
+  - scroll-direction: vertical
+`)
+	c, err := spec.ParseContainer(f)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(c.States) != 1 {
+		t.Fatalf("expected 1 state, got %d", len(c.States))
+	}
+	specs := c.States[0].Specs
+	if v := specs["border"].Value; v != "2dp white" {
+		t.Errorf("border: want '2dp white', got %v", v)
+	}
+	if v := specs["content-padding"].Value; v != "16dp on all sides" {
+		t.Errorf("content-padding: want '16dp on all sides', got %v", v)
+	}
+	if v := specs["scroll-direction"].Value; v != "vertical" {
+		t.Errorf("scroll-direction: want 'vertical', got %v", v)
+	}
+}
+
+func TestParseContainer_ExplicitStates_SequenceSpecs(t *testing.T) {
+	f := writeTempFile(t, `
+states:
+  - ref: default
+    specs:
+      - color: red
+      - font-size: 14sp
+`)
+	c, err := spec.ParseContainer(f)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(c.States) != 1 {
+		t.Fatalf("expected 1 state, got %d", len(c.States))
+	}
+	specs := c.States[0].Specs
+	if v := specs["color"].Value; v != "red" {
+		t.Errorf("color: want 'red', got %v", v)
+	}
+	if v := specs["font-size"].Value; v != "14sp" {
+		t.Errorf("font-size: want '14sp', got %v", v)
+	}
+}
+
 func TestLoadContainers(t *testing.T) {
 	dir := t.TempDir()
 
