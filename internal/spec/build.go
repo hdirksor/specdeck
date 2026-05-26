@@ -105,6 +105,10 @@ type eventOutput struct {
 	Actions     map[string]Action `yaml:"actions,omitempty"`
 }
 
+func eventToOutput(ev Event) eventOutput {
+	return eventOutput{Title: ev.Title, Description: ev.Description, Actions: ev.Actions}
+}
+
 func specsToOutput(specs map[string]SpecValue) map[string]specValueOutput {
 	if len(specs) == 0 {
 		return nil
@@ -140,21 +144,13 @@ func WriteBuiltContainer(path string, c Container, ownStates map[string]map[stri
 			States: statesToOutput(s.States),
 		}
 		for _, ev := range s.Events {
-			sec.Events = append(sec.Events, eventOutput{
-				Title:       ev.Title,
-				Description: ev.Description,
-				Actions:     ev.Actions,
-			})
+			sec.Events = append(sec.Events, eventToOutput(ev))
 		}
 		out.Sections = append(out.Sections, sec)
 	}
 
 	for _, ev := range c.Events {
-		out.Events = append(out.Events, eventOutput{
-			Title:       ev.Title,
-			Description: ev.Description,
-			Actions:     ev.Actions,
-		})
+		out.Events = append(out.Events, eventToOutput(ev))
 	}
 
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {

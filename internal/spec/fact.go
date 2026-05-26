@@ -27,7 +27,7 @@ type factFile struct {
 	Values []string `yaml:"values"`
 }
 
-func validateFactFile(f factFile) (Fact, error) {
+func validateFact(f factFile) (Fact, error) {
 	switch f.Type {
 	case FactTypeBoolean:
 	case FactTypeEnum:
@@ -66,7 +66,7 @@ func ParseFacts(path string) ([]Fact, error) {
 		if err := doc.Decode(&f); err != nil {
 			return nil, fmt.Errorf("parsing fact file: %w", err)
 		}
-		fact, err := validateFactFile(f)
+		fact, err := validateFact(f)
 		if err != nil {
 			return nil, err
 		}
@@ -79,7 +79,7 @@ func ParseFacts(path string) ([]Fact, error) {
 		}
 		facts := make([]Fact, 0, len(raw))
 		for _, f := range raw {
-			fact, err := validateFactFile(f)
+			fact, err := validateFact(f)
 			if err != nil {
 				return nil, err
 			}

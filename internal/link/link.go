@@ -43,6 +43,7 @@ Print the path to the created file when done.
 `
 
 // Link writes specdeck.yml and the Claude Code skills into dir.
+// dir is the working directory.
 // specsPath is the local path to the specs repo; it may be empty.
 func Link(dir, specsPath string) error {
 	if err := writeConfig(dir, specsPath); err != nil {
