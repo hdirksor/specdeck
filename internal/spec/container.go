@@ -51,12 +51,11 @@ type Container struct {
 
 // containerFile is the raw YAML structure for a container file.
 type containerFile struct {
-	Title       string               `yaml:"title"`
-	Description string               `yaml:"description"`
-	Default     string               `yaml:"default"`
-	Specs       map[string]yaml.Node `yaml:"specs"`
-	Containers  []containerRef       `yaml:"containers"`
-	Events      []eventFile          `yaml:"events"`
+	Title       string         `yaml:"title"`
+	Description string         `yaml:"description"`
+	Default     string         `yaml:"default"`
+	Containers  []containerRef `yaml:"containers"`
+	Events      []eventFile    `yaml:"events"`
 }
 
 type eventFile struct {
@@ -104,12 +103,14 @@ func ParseContainer(path string) (Container, error) {
 	c := Container{Default: defaultRef, Title: title, Description: raw.Description}
 
 	// Top-level specs fold into the default state.
-	if len(raw.Specs) > 0 {
-		specs, err := parseSpecMap(raw.Specs)
+	if specsNode := findNode(doc, "specs"); specsNode != nil {
+		specs, err := parseSpecNode(specsNode)
 		if err != nil {
 			return Container{}, err
 		}
-		c.States = append(c.States, StateSpec{Ref: defaultRef, Specs: specs})
+		if len(specs) > 0 {
+			c.States = append(c.States, StateSpec{Ref: defaultRef, Specs: specs})
+		}
 	}
 
 	statesSeq := findSequenceNode(doc, "states")
@@ -140,6 +141,55 @@ func ParseContainer(path string) (Container, error) {
 	return c, nil
 }
 
+// findNode returns the value node for a key within a YAML mapping node, or nil if not found.
+func findNode(doc *yaml.Node, key string) *yaml.Node {
+	if doc.Kind != yaml.MappingNode {
+		return nil
+	}
+	for i := 0; i+1 < len(doc.Content); i += 2 {
+		if doc.Content[i].Value == key {
+			return doc.Content[i+1]
+		}
+	}
+	return nil
+}
+
+// parseSpecNode converts a YAML specs node into a map of spec values.
+// Accepts both mapping format (key: value) and sequence format (- key: value).
+func parseSpecNode(node *yaml.Node) (map[string]SpecValue, error) {
+	if node == nil {
+		return nil, nil
+	}
+	switch node.Kind {
+	case yaml.MappingNode:
+		specs := make(map[string]SpecValue, len(node.Content)/2)
+		for i := 0; i+1 < len(node.Content); i += 2 {
+			sv, err := parseSpecValue(*node.Content[i+1])
+			if err != nil {
+				return nil, fmt.Errorf("spec %q: %w", node.Content[i].Value, err)
+			}
+			specs[node.Content[i].Value] = sv
+		}
+		return specs, nil
+	case yaml.SequenceNode:
+		specs := make(map[string]SpecValue, len(node.Content))
+		for _, item := range node.Content {
+			if item.Kind != yaml.MappingNode || len(item.Content) < 2 {
+				continue
+			}
+			key := item.Content[0].Value
+			sv, err := parseSpecValue(*item.Content[1])
+			if err != nil {
+				return nil, fmt.Errorf("spec %q: %w", key, err)
+			}
+			specs[key] = sv
+		}
+		return specs, nil
+	default:
+		return nil, fmt.Errorf("unexpected YAML node kind %v for specs", node.Kind)
+	}
+}
+
 // findSequenceNode returns the content slice of a sequence node identified by key
 // within a YAML mapping node, or nil if not found.
 func findSequenceNode(doc *yaml.Node, key string) []*yaml.Node {
@@ -165,7 +215,7 @@ func parseStateSpecNode(node *yaml.Node) (StateSpec, error) {
 
 	var ref string
 	var line int
-	var specsRaw map[string]yaml.Node
+	var specs map[string]SpecValue
 	var events map[string]interface{}
 
 	// Check for explicit `ref` key first.
@@ -192,7 +242,9 @@ func parseStateSpecNode(node *yaml.Node) (StateSpec, error) {
 	for i := 0; i+1 < len(node.Content); i += 2 {
 		switch node.Content[i].Value {
 		case "specs":
-			if err := node.Content[i+1].Decode(&specsRaw); err != nil {
+			var err error
+			specs, err = parseSpecNode(node.Content[i+1])
+			if err != nil {
 				return StateSpec{}, fmt.Errorf("parsing specs: %w", err)
 			}
 		case "events":
@@ -200,11 +252,6 @@ func parseStateSpecNode(node *yaml.Node) (StateSpec, error) {
 				return StateSpec{}, fmt.Errorf("parsing events: %w", err)
 			}
 		}
-	}
-
-	specs, err := parseSpecMap(specsRaw)
-	if err != nil {
-		return StateSpec{}, err
 	}
 
 	return StateSpec{Ref: ref, Line: line, Specs: specs, Events: events}, nil
