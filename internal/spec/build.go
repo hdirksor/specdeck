@@ -8,13 +8,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Section is one imported sub-container within a built container output.
-type Section struct {
-	Title  string
-	States map[string]map[string]SpecValue
-	Events []Event
-}
-
 // resolveStateSpecs computes per-state specs for a container with inheritance:
 // each state = default specs merged with that state's own overrides (state wins).
 func resolveStateSpecs(c Container) map[string]map[string]SpecValue {
@@ -44,76 +37,23 @@ func resolveStateSpecs(c Container) map[string]map[string]SpecValue {
 	return result
 }
 
-// ResolveContainerSections returns the container's own per-state specs and
-// one Section per imported container.
-func ResolveContainerSections(c Container, containersRoot string, byPath map[string]Container) (map[string]map[string]SpecValue, []Section) {
-	ownStates := resolveStateSpecs(c)
-
-	var imports []Section
-	for _, imp := range c.Imports {
-		absDir := filepath.Dir(filepath.Join(containersRoot, c.Path))
-		absImport := filepath.Join(absDir, imp.Ref)
-		rel, err := filepath.Rel(containersRoot, absImport)
-		if err != nil {
-			continue
-		}
-		imported, ok := byPath[rel]
-		if !ok {
-			continue
-		}
-		states := resolveStateSpecs(imported)
-		// Import-site overrides apply across all states.
-		if len(imp.Overrides) > 0 && len(states) > 0 {
-			for stateName, specs := range states {
-				merged := make(map[string]SpecValue, len(specs))
-				for k, v := range specs {
-					merged[k] = v
-				}
-				for k, v := range imp.Overrides {
-					merged[k] = v
-				}
-				states[stateName] = merged
-			}
-		}
-		imports = append(imports, Section{Title: imported.Title, States: states, Events: imported.Events})
-	}
-
-	return ownStates, imports
-}
-
 type builtContainerOutput struct {
 	Title       string                 `yaml:"title"`
 	Description string                 `yaml:"description,omitempty"`
 	States      map[string]stateOutput `yaml:"states,omitempty"`
-	Sections    []sectionOutput        `yaml:"containers,omitempty"`
-	Events      []eventOutput          `yaml:"events,omitempty"`
+	Containers  []sectionOutput        `yaml:"containers,omitempty"`
+	Events      []Event                `yaml:"events,omitempty"`
 }
 
 type stateOutput struct {
-	Specs map[string]specValueOutput `yaml:"specs,omitempty"`
+	Specs map[string]SpecValue `yaml:"specs,omitempty"`
 }
 
 type sectionOutput struct {
-	Title  string                 `yaml:"title"`
-	States map[string]stateOutput `yaml:"states,omitempty"`
-	Events []eventOutput          `yaml:"events,omitempty"`
-}
-
-type eventOutput struct {
-	Title       string            `yaml:"title"`
-	Description string            `yaml:"description,omitempty"`
-	Actions     map[string]Action `yaml:"actions,omitempty"`
-}
-
-func specsToOutput(specs map[string]SpecValue) map[string]specValueOutput {
-	if len(specs) == 0 {
-		return nil
-	}
-	out := make(map[string]specValueOutput, len(specs))
-	for k, v := range specs {
-		out[k] = specValueOutput{Value: v.Value, Description: v.Description}
-	}
-	return out
+	Title      string                 `yaml:"title"`
+	States     map[string]stateOutput `yaml:"states,omitempty"`
+	Containers []sectionOutput        `yaml:"containers,omitempty"`
+	Events     []Event                `yaml:"events,omitempty"`
 }
 
 func statesToOutput(states map[string]map[string]SpecValue) map[string]stateOutput {
@@ -122,39 +62,32 @@ func statesToOutput(states map[string]map[string]SpecValue) map[string]stateOutp
 	}
 	out := make(map[string]stateOutput, len(states))
 	for name, specs := range states {
-		out[name] = stateOutput{Specs: specsToOutput(specs)}
+		out[name] = stateOutput{Specs: specs}
 	}
 	return out
 }
 
-func WriteBuiltContainer(path string, c Container, ownStates map[string]map[string]SpecValue, imports []Section) error {
+func buildSectionOutput(c Container) sectionOutput {
+	sec := sectionOutput{
+		Title:  c.Title,
+		States: statesToOutput(resolveStateSpecs(c)),
+		Events: c.Events,
+	}
+	for _, sub := range c.Containers {
+		sec.Containers = append(sec.Containers, buildSectionOutput(sub))
+	}
+	return sec
+}
+
+func WriteBuiltContainer(path string, c Container) error {
 	out := builtContainerOutput{
 		Title:       c.Title,
 		Description: c.Description,
-		States:      statesToOutput(ownStates),
+		States:      statesToOutput(resolveStateSpecs(c)),
+		Events:      c.Events,
 	}
-
-	for _, s := range imports {
-		sec := sectionOutput{
-			Title:  s.Title,
-			States: statesToOutput(s.States),
-		}
-		for _, ev := range s.Events {
-			sec.Events = append(sec.Events, eventOutput{
-				Title:       ev.Title,
-				Description: ev.Description,
-				Actions:     ev.Actions,
-			})
-		}
-		out.Sections = append(out.Sections, sec)
-	}
-
-	for _, ev := range c.Events {
-		out.Events = append(out.Events, eventOutput{
-			Title:       ev.Title,
-			Description: ev.Description,
-			Actions:     ev.Actions,
-		})
+	for _, sub := range c.Containers {
+		out.Containers = append(out.Containers, buildSectionOutput(sub))
 	}
 
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {

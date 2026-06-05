@@ -30,7 +30,7 @@ func TestWriteBuiltContainerMarkdown_TitleAndDescription(t *testing.T) {
 	outPath := filepath.Join(dir, "out.md")
 
 	c := spec.Container{Title: "Jot", Description: "Note-taking screen"}
-	if err := spec.WriteBuiltContainerMarkdown(outPath, c, nil, nil); err != nil {
+	if err := spec.WriteBuiltContainerMarkdown(outPath, c); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -43,14 +43,16 @@ func TestWriteBuiltContainerMarkdown_SpecTable(t *testing.T) {
 	dir := t.TempDir()
 	outPath := filepath.Join(dir, "out.md")
 
-	c := spec.Container{Title: "Card"}
-	ownStates := map[string]map[string]spec.SpecValue{
-		"default": {
-			"bgColor":   {Value: "white"},
-			"textColor": {Value: "black"},
+	c := spec.Container{
+		Title: "Card",
+		States: []spec.StateSpec{
+			{Ref: "default", Specs: map[string]spec.SpecValue{
+				"bgColor":   {Value: "white"},
+				"textColor": {Value: "black"},
+			}},
 		},
 	}
-	if err := spec.WriteBuiltContainerMarkdown(outPath, c, ownStates, nil); err != nil {
+	if err := spec.WriteBuiltContainerMarkdown(outPath, c); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -65,17 +67,22 @@ func TestWriteBuiltContainerMarkdown_MultiState_DefaultFirst(t *testing.T) {
 	dir := t.TempDir()
 	outPath := filepath.Join(dir, "out.md")
 
-	c := spec.Container{Title: "Card"}
-	ownStates := map[string]map[string]spec.SpecValue{
-		"default": {"bgColor": {Value: "white"}, "textColor": {Value: "black"}},
-		"dark":    {"bgColor": {Value: "#1A1A1A"}, "textColor": {Value: "white"}},
+	c := spec.Container{
+		Title: "Card",
+		States: []spec.StateSpec{
+			{Ref: "default", Specs: map[string]spec.SpecValue{
+				"bgColor": {Value: "white"}, "textColor": {Value: "black"},
+			}},
+			{Ref: "dark", Specs: map[string]spec.SpecValue{
+				"bgColor": {Value: "#1A1A1A"},
+			}},
+		},
 	}
-	if err := spec.WriteBuiltContainerMarkdown(outPath, c, ownStates, nil); err != nil {
+	if err := spec.WriteBuiltContainerMarkdown(outPath, c); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	got := readMarkdown(t, outPath)
-	// ## default section must appear before ## dark section
 	defaultIdx := strings.Index(got, "## default")
 	darkIdx := strings.Index(got, "## dark")
 	if defaultIdx == -1 || darkIdx == -1 {
@@ -88,20 +95,24 @@ func TestWriteBuiltContainerMarkdown_MultiState_DefaultFirst(t *testing.T) {
 	assertContains(t, got, "| bgColor | #1A1A1A |")
 }
 
-func TestWriteBuiltContainerMarkdown_ImportedSection(t *testing.T) {
+func TestWriteBuiltContainerMarkdown_SubContainer(t *testing.T) {
 	dir := t.TempDir()
 	outPath := filepath.Join(dir, "out.md")
 
-	c := spec.Container{Title: "Jot"}
-	imports := []spec.Section{
-		{
-			Title: "Note Input",
-			States: map[string]map[string]spec.SpecValue{
-				"default": {"formLabelText": {Value: "Notes"}},
+	c := spec.Container{
+		Title: "Jot",
+		Containers: []spec.Container{
+			{
+				Title: "Note Input",
+				States: []spec.StateSpec{
+					{Ref: "default", Specs: map[string]spec.SpecValue{
+						"formLabelText": {Value: "Notes"},
+					}},
+				},
 			},
 		},
 	}
-	if err := spec.WriteBuiltContainerMarkdown(outPath, c, nil, imports); err != nil {
+	if err := spec.WriteBuiltContainerMarkdown(outPath, c); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -127,7 +138,7 @@ func TestWriteBuiltContainerMarkdown_OwnEvents(t *testing.T) {
 			},
 		},
 	}
-	if err := spec.WriteBuiltContainerMarkdown(outPath, c, nil, nil); err != nil {
+	if err := spec.WriteBuiltContainerMarkdown(outPath, c); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -139,28 +150,32 @@ func TestWriteBuiltContainerMarkdown_OwnEvents(t *testing.T) {
 	assertContains(t, got, "destination: /jot/tags")
 }
 
-func TestWriteBuiltContainerMarkdown_SectionEvents(t *testing.T) {
+func TestWriteBuiltContainerMarkdown_SubContainerEvents(t *testing.T) {
 	dir := t.TempDir()
 	outPath := filepath.Join(dir, "out.md")
 
-	c := spec.Container{Title: "Jot"}
-	imports := []spec.Section{
-		{
-			Title: "Note Input",
-			States: map[string]map[string]spec.SpecValue{
-				"default": {"formLabelText": {Value: "Notes"}},
-			},
-			Events: []spec.Event{
-				{
-					Title: "on-press-alt-e",
-					Actions: map[string]spec.Action{
-						"open": {"description": "open editor"},
+	c := spec.Container{
+		Title: "Jot",
+		Containers: []spec.Container{
+			{
+				Title: "Note Input",
+				States: []spec.StateSpec{
+					{Ref: "default", Specs: map[string]spec.SpecValue{
+						"formLabelText": {Value: "Notes"},
+					}},
+				},
+				Events: []spec.Event{
+					{
+						Title: "on-press-alt-e",
+						Actions: map[string]spec.Action{
+							"open": {"description": "open editor"},
+						},
 					},
 				},
 			},
 		},
 	}
-	if err := spec.WriteBuiltContainerMarkdown(outPath, c, nil, imports); err != nil {
+	if err := spec.WriteBuiltContainerMarkdown(outPath, c); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -177,7 +192,7 @@ func TestWriteBuiltContainerMarkdown_CreatesDirectory(t *testing.T) {
 	outPath := filepath.Join(dir, "nested", "deep", "out.md")
 
 	c := spec.Container{Title: "X"}
-	if err := spec.WriteBuiltContainerMarkdown(outPath, c, nil, nil); err != nil {
+	if err := spec.WriteBuiltContainerMarkdown(outPath, c); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 

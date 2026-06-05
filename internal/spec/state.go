@@ -9,15 +9,9 @@ import (
 )
 
 type State struct {
-	Name    string
-	Summary string
-	Facts   map[string]interface{}
-}
-
-type stateFile struct {
 	Name    string                 `yaml:"name"`
-	Summary string                 `yaml:"summary"`
-	Facts   map[string]interface{} `yaml:"facts"`
+	Summary string                 `yaml:"summary,omitempty"`
+	Facts   map[string]interface{} `yaml:"facts,omitempty"`
 }
 
 func ParseStates(path string) ([]State, error) {
@@ -26,19 +20,19 @@ func ParseStates(path string) ([]State, error) {
 		return nil, fmt.Errorf("reading states file: %w", err)
 	}
 
-	var raw []stateFile
+	var raw []State
 	if err := yaml.Unmarshal(data, &raw); err != nil {
 		return nil, fmt.Errorf("parsing states file: %w", err)
 	}
 
 	seen := make(map[string]bool)
 	states := make([]State, 0, len(raw))
-	for _, r := range raw {
-		if seen[r.Name] {
-			return nil, fmt.Errorf("duplicate state name %q in %s", r.Name, path)
+	for _, s := range raw {
+		if seen[s.Name] {
+			return nil, fmt.Errorf("duplicate state name %q in %s", s.Name, path)
 		}
-		seen[r.Name] = true
-		states = append(states, State{Name: r.Name, Summary: r.Summary, Facts: r.Facts})
+		seen[s.Name] = true
+		states = append(states, s)
 	}
 	return states, nil
 }

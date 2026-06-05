@@ -16,18 +16,12 @@ const (
 )
 
 type Fact struct {
-	Name   string
-	Type   FactType
-	Values []string
-}
-
-type factFile struct {
 	Name   string   `yaml:"name"`
 	Type   FactType `yaml:"type"`
-	Values []string `yaml:"values"`
+	Values []string `yaml:"values,omitempty"`
 }
 
-func validateFactFile(f factFile) (Fact, error) {
+func validateFact(f Fact) (Fact, error) {
 	switch f.Type {
 	case FactTypeBoolean:
 	case FactTypeEnum:
@@ -37,8 +31,7 @@ func validateFactFile(f factFile) (Fact, error) {
 	default:
 		return Fact{}, fmt.Errorf("fact %q: unknown type %q (must be boolean or enum)", f.Name, f.Type)
 	}
-
-	return Fact{Name: f.Name, Type: f.Type, Values: f.Values}, nil
+	return f, nil
 }
 
 // ParseFacts parses a fact file containing either a single fact (mapping) or
@@ -62,24 +55,24 @@ func ParseFacts(path string) ([]Fact, error) {
 
 	switch doc.Kind {
 	case yaml.MappingNode:
-		var f factFile
+		var f Fact
 		if err := doc.Decode(&f); err != nil {
 			return nil, fmt.Errorf("parsing fact file: %w", err)
 		}
-		fact, err := validateFactFile(f)
+		fact, err := validateFact(f)
 		if err != nil {
 			return nil, err
 		}
 		return []Fact{fact}, nil
 
 	case yaml.SequenceNode:
-		var raw []factFile
+		var raw []Fact
 		if err := doc.Decode(&raw); err != nil {
 			return nil, fmt.Errorf("parsing fact file: %w", err)
 		}
 		facts := make([]Fact, 0, len(raw))
 		for _, f := range raw {
-			fact, err := validateFactFile(f)
+			fact, err := validateFact(f)
 			if err != nil {
 				return nil, err
 			}

@@ -8,39 +8,20 @@ import (
 )
 
 type containerOutput struct {
-	Default string              `yaml:"default,omitempty"`
-	States  []stateSpecOutput   `yaml:"states"`
+	Default string            `yaml:"default,omitempty"`
+	States  []stateSpecOutput `yaml:"states"`
 }
 
 type stateSpecOutput struct {
-	Ref    string                     `yaml:"ref"`
-	Specs  map[string]specValueOutput `yaml:"specs"`
-	Events map[string]interface{}     `yaml:"events"`
-}
-
-type specValueOutput struct {
-	Value       interface{}
-	Description string
-}
-
-func (s specValueOutput) MarshalYAML() (interface{}, error) {
-	if s.Description == "" {
-		return s.Value, nil
-	}
-	return struct {
-		Value       interface{} `yaml:"value"`
-		Description string      `yaml:"description"`
-	}{s.Value, s.Description}, nil
+	Ref    string                 `yaml:"ref"`
+	Specs  map[string]SpecValue   `yaml:"specs"`
+	Events map[string]interface{} `yaml:"events"`
 }
 
 func WriteContainer(path string, c Container) error {
 	out := containerOutput{Default: c.Default}
 	for _, ss := range c.States {
-		specs := make(map[string]specValueOutput, len(ss.Specs))
-		for k, v := range ss.Specs {
-			specs[k] = specValueOutput{Value: v.Value, Description: v.Description}
-		}
-		out.States = append(out.States, stateSpecOutput{Ref: ss.Ref, Specs: specs, Events: ss.Events})
+		out.States = append(out.States, stateSpecOutput{Ref: ss.Ref, Specs: ss.Specs, Events: ss.Events})
 	}
 
 	f, err := os.Create(path)

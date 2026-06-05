@@ -47,27 +47,19 @@ func runBuild(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("\U0001F7E5  %w", err)
 	}
 
-	byPath := make(map[string]spec.Container, len(containers))
-	for _, c := range containers {
-		byPath[c.Path] = c
-	}
-
 	distRoot := filepath.Join(root, "dist")
 
-	// For markdown builds: track dirs covered by index.yml → _index.md and dirs with only leaf files.
 	sectionDirs := make(map[string]bool)
-	leafDirs := make(map[string]string) // abs dir path → dir base name
+	leafDirs := make(map[string]string)
 
 	for _, c := range containers {
-		ownStates, imports := spec.ResolveContainerSections(c, containersRoot, byPath)
-
 		stem := strings.TrimSuffix(c.Path, filepath.Ext(c.Path))
 		var outPath string
 		var writeErr error
 
 		if buildFormat == "yaml" {
 			outPath = filepath.Join(distRoot, stem+".yml")
-			writeErr = spec.WriteBuiltContainer(outPath, c, ownStates, imports)
+			writeErr = spec.WriteBuiltContainer(outPath, c)
 		} else {
 			relDir := filepath.Dir(stem)
 			if filepath.Base(stem) == "index" {
@@ -82,7 +74,7 @@ func runBuild(cmd *cobra.Command, args []string) error {
 					}
 				}
 			}
-			writeErr = spec.WriteBuiltContainerMarkdown(outPath, c, ownStates, imports)
+			writeErr = spec.WriteBuiltContainerMarkdown(outPath, c)
 		}
 
 		if writeErr != nil {
@@ -92,7 +84,6 @@ func runBuild(cmd *cobra.Command, args []string) error {
 		fmt.Printf("\U0001F7E2  dist/%s\n", filepath.ToSlash(relOut))
 	}
 
-	// Emit _index.md stubs for dirs that have leaf files but no index.yml.
 	if buildFormat == "markdown" {
 		for dir, name := range leafDirs {
 			if sectionDirs[dir] {

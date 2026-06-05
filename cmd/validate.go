@@ -53,22 +53,9 @@ func runValidate(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("\U0001F7E5  %w", err)
 	}
-
-	containerErrs := spec.ValidateImports(containersRoot, containers)
-	for i := range containerErrs {
-		containerErrs[i].File = filepath.Join("containers", containerErrs[i].File)
-	}
-	containerErrFiles := make(map[string]bool, len(containerErrs))
-	for _, e := range containerErrs {
-		containerErrFiles[e.File] = true
-	}
 	for _, c := range containers {
-		path := filepath.Join("containers", c.Path)
-		if !containerErrFiles[path] {
-			fmt.Printf("\U0001F7E2  %s\n", path)
-		}
+		fmt.Printf("\U0001F7E2  %s\n", filepath.Join("containers", c.Path))
 	}
-	allErrs = append(allErrs, containerErrs...)
 
 	if len(allErrs) == 0 {
 		facts, err := spec.LoadFacts(factsDir)
@@ -83,19 +70,11 @@ func runValidate(cmd *cobra.Command, args []string) error {
 	}
 
 	for _, e := range allErrs {
-		printValidationError(e)
+		fmt.Fprintf(os.Stderr, "\U0001F7E5  %s  %s\n", e.File, e.Message)
 	}
 
 	if len(allErrs) > 0 {
 		return fmt.Errorf("%d validation error(s)", len(allErrs))
 	}
 	return nil
-}
-
-func printValidationError(e spec.ValidationError) {
-	loc := e.File
-	if e.Line > 0 {
-		loc = fmt.Sprintf("%s:%d", e.File, e.Line)
-	}
-	fmt.Fprintf(os.Stderr, "\U0001F7E5  %s  %s\n", loc, e.Message)
 }

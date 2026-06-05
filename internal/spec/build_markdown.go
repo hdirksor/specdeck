@@ -22,7 +22,7 @@ func WriteHugoSectionStub(path, title string) error {
 	return nil
 }
 
-func WriteBuiltContainerMarkdown(path string, c Container, ownStates map[string]map[string]SpecValue, imports []Section) error {
+func WriteBuiltContainerMarkdown(path string, c Container) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return fmt.Errorf("creating directory: %w", err)
 	}
@@ -31,17 +31,17 @@ func WriteBuiltContainerMarkdown(path string, c Container, ownStates map[string]
 		return fmt.Errorf("creating file: %w", err)
 	}
 	defer f.Close()
-	return renderMarkdown(f, c, ownStates, imports)
+	return renderMarkdown(f, c)
 }
 
-func renderMarkdown(w io.Writer, c Container, ownStates map[string]map[string]SpecValue, imports []Section) error {
+func renderMarkdown(w io.Writer, c Container) error {
 	fmt.Fprintf(w, "# %s\n", c.Title)
 	if c.Description != "" {
 		fmt.Fprintf(w, "\n%s\n", c.Description)
 	}
 
-	if len(ownStates) > 0 {
-		writeStateSections(w, ownStates, "##")
+	if states := resolveStateSpecs(c); len(states) > 0 {
+		writeStateSections(w, states, "##")
 	}
 
 	if len(c.Events) > 0 {
@@ -49,23 +49,31 @@ func renderMarkdown(w io.Writer, c Container, ownStates map[string]map[string]Sp
 		writeEventList(w, c.Events, "###")
 	}
 
-	for _, sec := range imports {
-		fmt.Fprintf(w, "\n## %s\n", sec.Title)
-		if len(sec.States) > 0 {
-			writeStateSections(w, sec.States, "###")
-		}
-		if len(sec.Events) > 0 {
-			fmt.Fprintf(w, "\n### Events\n\n")
-			writeEventList(w, sec.Events, "####")
-		}
+	for _, sub := range c.Containers {
+		renderSubContainer(w, sub, 2)
 	}
 
 	return nil
 }
 
-// writeStateSections renders each state as a heading (for anchor links) followed
-// by a two-column spec table. Default state is always first; remaining states
-// are sorted alphabetically.
+func renderSubContainer(w io.Writer, c Container, level int) {
+	h := strings.Repeat("#", level)
+	fmt.Fprintf(w, "\n%s %s\n", h, c.Title)
+
+	if states := resolveStateSpecs(c); len(states) > 0 {
+		writeStateSections(w, states, strings.Repeat("#", level+1))
+	}
+
+	if len(c.Events) > 0 {
+		fmt.Fprintf(w, "\n%s Events\n\n", strings.Repeat("#", level+1))
+		writeEventList(w, c.Events, strings.Repeat("#", level+2))
+	}
+
+	for _, sub := range c.Containers {
+		renderSubContainer(w, sub, level+1)
+	}
+}
+
 func writeStateSections(w io.Writer, states map[string]map[string]SpecValue, heading string) {
 	names := sortedStateNames(states)
 	for _, name := range names {
@@ -75,7 +83,7 @@ func writeStateSections(w io.Writer, states map[string]map[string]SpecValue, hea
 		fmt.Fprintln(w, "| Spec | Value |")
 		fmt.Fprintln(w, "| --- | --- |")
 		for _, key := range keys {
-			fmt.Fprintf(w, "| %s | %v |\n", key, specs[key].Value)
+			fmt.Fprintf(w, "| %s | %s |\n", key, specs[key].Value)
 		}
 	}
 }

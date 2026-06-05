@@ -10,19 +10,22 @@ import (
 )
 
 type SpecValue struct {
-	Value       any
+	Value       string
 	Description string
 }
 
-type Import struct {
-	Ref       string
-	Line      int
-	Overrides map[string]SpecValue
+func (s SpecValue) MarshalYAML() (interface{}, error) {
+	if s.Description == "" {
+		return s.Value, nil
+	}
+	return struct {
+		Value       string `yaml:"value"`
+		Description string `yaml:"description"`
+	}{s.Value, s.Description}, nil
 }
 
 type StateSpec struct {
 	Ref    string
-	Line   int
 	Specs  map[string]SpecValue
 	Events map[string]interface{}
 }
@@ -33,9 +36,9 @@ type Action map[string]interface{}
 // Event is a top-level interaction on a container: a trigger name, optional
 // description, and one or more typed actions.
 type Event struct {
-	Title       string
-	Description string
-	Actions     map[string]Action
+	Title       string            `yaml:"title"`
+	Description string            `yaml:"description,omitempty"`
+	Actions     map[string]Action `yaml:"actions,omitempty"`
 }
 
 type Container struct {
@@ -45,29 +48,26 @@ type Container struct {
 	Description string
 	Default     string
 	States      []StateSpec
-	Imports     []Import
+	Containers  []Container
 	Events      []Event
+
+	// rawRef and rawOverrides hold unresolved $ref data during parsing.
+	// LoadContainerTree resolves them; after that these are zero.
+	rawRef       string
+	rawOverrides map[string]SpecValue
 }
 
 // containerFile is the raw YAML structure for a container file.
 type containerFile struct {
-	Title       string         `yaml:"title"`
-	Description string         `yaml:"description"`
-	Default     string         `yaml:"default"`
-	Containers  []containerRef `yaml:"containers"`
-	Events      []eventFile    `yaml:"events"`
+	Title       string  `yaml:"title"`
+	Description string  `yaml:"description"`
+	Default     string  `yaml:"default"`
+	Events      []Event `yaml:"events"`
 }
 
-type eventFile struct {
-	Title       string            `yaml:"title"`
-	Description string            `yaml:"description"`
-	Actions     map[string]Action `yaml:"actions"`
-}
-
-type containerRef struct {
-	Ref string `yaml:"$ref"`
-}
-
+// ParseContainer parses a single container file without following $refs.
+// $ref entries in containers: become stubs in Container.Containers with
+// unexported rawRef set. Use LoadContainerTree to get a fully resolved tree.
 func ParseContainer(path string) (Container, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -83,11 +83,22 @@ func ParseContainer(path string) (Container, error) {
 		return Container{}, nil
 	}
 
-	doc := root.Content[0]
+	c, err := parseContainerNode(root.Content[0])
+	if err != nil {
+		return Container{}, err
+	}
 
+	if c.Title == "" {
+		c.Title = strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	}
+
+	return c, nil
+}
+
+func parseContainerNode(doc *yaml.Node) (Container, error) {
 	var raw containerFile
 	if err := doc.Decode(&raw); err != nil {
-		return Container{}, fmt.Errorf("parsing container file: %w", err)
+		return Container{}, fmt.Errorf("parsing container: %w", err)
 	}
 
 	defaultRef := "default"
@@ -95,14 +106,13 @@ func ParseContainer(path string) (Container, error) {
 		defaultRef = raw.Default
 	}
 
-	title := raw.Title
-	if title == "" {
-		title = strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	c := Container{
+		Default:     defaultRef,
+		Title:       raw.Title,
+		Description: raw.Description,
+		Events:      raw.Events,
 	}
 
-	c := Container{Default: defaultRef, Title: title, Description: raw.Description}
-
-	// Top-level specs fold into the default state.
 	if specsNode := findNode(doc, "specs"); specsNode != nil {
 		specs, err := parseSpecNode(specsNode)
 		if err != nil {
@@ -124,24 +134,158 @@ func ParseContainer(path string) (Container, error) {
 		}
 	}
 
-	imports, err := parseContainerImports(doc)
+	containers, err := parseContainersNode(doc)
 	if err != nil {
 		return Container{}, err
 	}
-	c.Imports = imports
-
-	for _, ef := range raw.Events {
-		c.Events = append(c.Events, Event{
-			Title:       ef.Title,
-			Description: ef.Description,
-			Actions:     ef.Actions,
-		})
-	}
+	c.Containers = containers
 
 	return c, nil
 }
 
-// findNode returns the value node for a key within a YAML mapping node, or nil if not found.
+// parseContainersNode parses the containers: sequence from a YAML mapping node.
+// $ref entries produce stubs with rawRef/rawOverrides set.
+// Inline entries are fully parsed into Containers.
+func parseContainersNode(doc *yaml.Node) ([]Container, error) {
+	seq := findSequenceNode(doc, "containers")
+	if seq == nil {
+		return nil, nil
+	}
+
+	var containers []Container
+	for _, item := range seq {
+		if item.Kind != yaml.MappingNode {
+			continue
+		}
+
+		var ref string
+		var overrideNodes map[string]yaml.Node
+
+		for j := 0; j+1 < len(item.Content); j += 2 {
+			k := item.Content[j].Value
+			v := item.Content[j+1]
+			if k == "$ref" {
+				ref = v.Value
+			} else {
+				if overrideNodes == nil {
+					overrideNodes = make(map[string]yaml.Node)
+				}
+				overrideNodes[k] = *v
+			}
+		}
+
+		if ref != "" {
+			var overrides map[string]SpecValue
+			if len(overrideNodes) > 0 {
+				var err error
+				overrides, err = parseSpecMap(overrideNodes)
+				if err != nil {
+					return nil, fmt.Errorf("parsing overrides for %s: %w", ref, err)
+				}
+			}
+			containers = append(containers, Container{rawRef: ref, rawOverrides: overrides})
+		} else {
+			inline, err := parseContainerNode(item)
+			if err != nil {
+				return nil, fmt.Errorf("parsing inline container: %w", err)
+			}
+			containers = append(containers, inline)
+		}
+	}
+	return containers, nil
+}
+
+// LoadContainerTree loads a container file and recursively resolves all $ref entries.
+func LoadContainerTree(path, containersRoot string) (Container, error) {
+	c, err := ParseContainer(path)
+	if err != nil {
+		return Container{}, err
+	}
+	return resolveContainerRefs(c, filepath.Dir(path), containersRoot)
+}
+
+func resolveContainerRefs(c Container, baseDir, containersRoot string) (Container, error) {
+	resolved := make([]Container, 0, len(c.Containers))
+	for _, sub := range c.Containers {
+		if sub.rawRef == "" {
+			r, err := resolveContainerRefs(sub, baseDir, containersRoot)
+			if err != nil {
+				return Container{}, err
+			}
+			resolved = append(resolved, r)
+		} else {
+			absPath := filepath.Join(baseDir, sub.rawRef)
+			loaded, err := ParseContainer(absPath)
+			if err != nil {
+				return Container{}, fmt.Errorf("loading %s: %w", sub.rawRef, err)
+			}
+			rel, err := filepath.Rel(containersRoot, absPath)
+			if err != nil {
+				return Container{}, fmt.Errorf("resolving path for %s: %w", sub.rawRef, err)
+			}
+			loaded.Path = rel
+			if len(sub.rawOverrides) > 0 {
+				loaded = applyOverrides(loaded, sub.rawOverrides)
+			}
+			r, err := resolveContainerRefs(loaded, filepath.Dir(absPath), containersRoot)
+			if err != nil {
+				return Container{}, err
+			}
+			resolved = append(resolved, r)
+		}
+	}
+	c.Containers = resolved
+	return c, nil
+}
+
+func applyOverrides(c Container, overrides map[string]SpecValue) Container {
+	for i, ss := range c.States {
+		merged := make(map[string]SpecValue, len(ss.Specs)+len(overrides))
+		for k, v := range ss.Specs {
+			merged[k] = v
+		}
+		for k, v := range overrides {
+			merged[k] = v
+		}
+		c.States[i].Specs = merged
+	}
+	return c
+}
+
+// LoadContainers walks the containers root directory and loads every container file
+// with all $refs resolved.
+func LoadContainers(root string) ([]Container, error) {
+	var containers []Container
+
+	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if filepath.Ext(d.Name()) != ".yml" {
+			return nil
+		}
+
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+
+		c, err := LoadContainerTree(path, root)
+		if err != nil {
+			return fmt.Errorf("loading container %s: %w", rel, err)
+		}
+
+		c.Path = rel
+		containers = append(containers, c)
+		return nil
+	})
+
+	return containers, err
+}
+
 func findNode(doc *yaml.Node, key string) *yaml.Node {
 	if doc.Kind != yaml.MappingNode {
 		return nil
@@ -154,8 +298,6 @@ func findNode(doc *yaml.Node, key string) *yaml.Node {
 	return nil
 }
 
-// parseSpecNode converts a YAML specs node into a map of spec values.
-// Accepts both mapping format (key: value) and sequence format (- key: value).
 func parseSpecNode(node *yaml.Node) (map[string]SpecValue, error) {
 	if node == nil {
 		return nil, nil
@@ -190,8 +332,6 @@ func parseSpecNode(node *yaml.Node) (map[string]SpecValue, error) {
 	}
 }
 
-// findSequenceNode returns the content slice of a sequence node identified by key
-// within a YAML mapping node, or nil if not found.
 func findSequenceNode(doc *yaml.Node, key string) []*yaml.Node {
 	if doc.Kind != yaml.MappingNode {
 		return nil
@@ -204,36 +344,27 @@ func findSequenceNode(doc *yaml.Node, key string) []*yaml.Node {
 	return nil
 }
 
-// parseStateSpecNode parses a state entry from a YAML mapping node.
-// Supports two formats:
-//   - ref format:      `ref: state-name`
-//   - name-as-key:    `state-name:` (first key that is not a known metadata key)
 func parseStateSpecNode(node *yaml.Node) (StateSpec, error) {
 	if node.Kind != yaml.MappingNode {
 		return StateSpec{}, fmt.Errorf("expected state entry to be a mapping")
 	}
 
 	var ref string
-	var line int
 	var specs map[string]SpecValue
 	var events map[string]interface{}
 
-	// Check for explicit `ref` key first.
 	for i := 0; i+1 < len(node.Content); i += 2 {
 		if node.Content[i].Value == "ref" {
 			ref = node.Content[i+1].Value
-			line = node.Content[i+1].Line
 			break
 		}
 	}
 
-	// Name-as-key format: first key that isn't a known metadata key is the state name.
 	if ref == "" && len(node.Content) >= 2 {
 		known := map[string]bool{"specs": true, "events": true, "behavior": true}
 		for i := 0; i+1 < len(node.Content); i += 2 {
 			if !known[node.Content[i].Value] {
 				ref = node.Content[i].Value
-				line = node.Content[i].Line
 				break
 			}
 		}
@@ -254,62 +385,9 @@ func parseStateSpecNode(node *yaml.Node) (StateSpec, error) {
 		}
 	}
 
-	return StateSpec{Ref: ref, Line: line, Specs: specs, Events: events}, nil
+	return StateSpec{Ref: ref, Specs: specs, Events: events}, nil
 }
 
-// parseContainerImports extracts Import entries from the "containers" sequence
-// of a YAML mapping node. Keys other than "$ref" in each entry are treated as
-// spec overrides applied when the import is resolved.
-func parseContainerImports(doc *yaml.Node) ([]Import, error) {
-	if doc.Kind != yaml.MappingNode {
-		return nil, nil
-	}
-	for i := 0; i+1 < len(doc.Content); i += 2 {
-		if doc.Content[i].Value != "containers" {
-			continue
-		}
-		seq := doc.Content[i+1]
-		if seq.Kind != yaml.SequenceNode {
-			break
-		}
-		var imports []Import
-		for _, item := range seq.Content {
-			if item.Kind != yaml.MappingNode {
-				continue
-			}
-			var imp Import
-			var overrideNodes map[string]yaml.Node
-			for j := 0; j+1 < len(item.Content); j += 2 {
-				k := item.Content[j].Value
-				v := item.Content[j+1]
-				if k == "$ref" {
-					imp.Ref = v.Value
-					imp.Line = v.Line
-				} else {
-					if overrideNodes == nil {
-						overrideNodes = make(map[string]yaml.Node)
-					}
-					overrideNodes[k] = *v
-				}
-			}
-			if imp.Ref == "" {
-				continue
-			}
-			if len(overrideNodes) > 0 {
-				specs, err := parseSpecMap(overrideNodes)
-				if err != nil {
-					return nil, fmt.Errorf("parsing overrides for %s: %w", imp.Ref, err)
-				}
-				imp.Overrides = specs
-			}
-			imports = append(imports, imp)
-		}
-		return imports, nil
-	}
-	return nil, nil
-}
-
-// parseSpecMap handles both shorthand (scalar) and verbose (mapping) spec values.
 func parseSpecMap(raw map[string]yaml.Node) (map[string]SpecValue, error) {
 	specs := make(map[string]SpecValue, len(raw))
 	for key, node := range raw {
@@ -323,7 +401,6 @@ func parseSpecMap(raw map[string]yaml.Node) (map[string]SpecValue, error) {
 }
 
 func parseSpecValue(node yaml.Node) (SpecValue, error) {
-	// Dereference alias nodes.
 	n := &node
 	if n.Kind == yaml.AliasNode {
 		n = n.Alias
@@ -334,8 +411,8 @@ func parseSpecValue(node yaml.Node) (SpecValue, error) {
 		return SpecValue{Value: n.Value}, nil
 	case yaml.MappingNode:
 		var verbose struct {
-			Value       interface{} `yaml:"value"`
-			Description string      `yaml:"description"`
+			Value       string `yaml:"value"`
+			Description string `yaml:"description"`
 		}
 		if err := n.Decode(&verbose); err != nil {
 			return SpecValue{}, fmt.Errorf("decoding verbose spec: %w", err)
@@ -344,40 +421,4 @@ func parseSpecValue(node yaml.Node) (SpecValue, error) {
 	default:
 		return SpecValue{}, fmt.Errorf("unexpected YAML node kind %v", n.Kind)
 	}
-}
-
-// LoadContainers walks the containers root directory and parses every container file.
-// Non-leaf containers are represented by index.yml files.
-func LoadContainers(root string) ([]Container, error) {
-	var containers []Container
-
-	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() {
-			return nil
-		}
-
-		ext := filepath.Ext(d.Name())
-		if ext != ".yml" {
-			return nil
-		}
-
-		rel, err := filepath.Rel(root, path)
-		if err != nil {
-			return err
-		}
-
-		c, err := ParseContainer(path)
-		if err != nil {
-			return fmt.Errorf("parsing container %s: %w", rel, err)
-		}
-
-		c.Path = rel
-		containers = append(containers, c)
-		return nil
-	})
-
-	return containers, err
 }

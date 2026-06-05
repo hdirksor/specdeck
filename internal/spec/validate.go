@@ -36,7 +36,6 @@ func Validate(facts []Fact, states []State, containers []Container) []Validation
 			if !stateNames[ss.Ref] {
 				errs = append(errs, ValidationError{
 					File:    c.Path,
-					Line:    ss.Line,
 					Message: fmt.Sprintf("references unknown state %q", ss.Ref),
 				})
 			}
@@ -47,7 +46,6 @@ func Validate(facts []Fact, states []State, containers []Container) []Validation
 }
 
 // ValidateFactFiles parses every .yml file in dir and returns one ValidationError per invalid file.
-// validFiles contains the names of files that parsed successfully.
 func ValidateFactFiles(dir string) (validFiles []string, errs []ValidationError) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -67,7 +65,6 @@ func ValidateFactFiles(dir string) (validFiles []string, errs []ValidationError)
 }
 
 // ValidateStateFiles parses every .yml file in dir and returns one ValidationError per invalid file.
-// validFiles contains the names of files that parsed successfully.
 func ValidateStateFiles(dir string) (validFiles []string, errs []ValidationError) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -84,24 +81,4 @@ func ValidateStateFiles(dir string) (validFiles []string, errs []ValidationError
 		}
 	}
 	return validFiles, errs
-}
-
-// ValidateImports checks that every $ref in each container resolves to an existing file.
-// Paths are resolved relative to the container file's directory within containersRoot.
-func ValidateImports(containersRoot string, containers []Container) []ValidationError {
-	var errs []ValidationError
-	for _, c := range containers {
-		containerDir := filepath.Dir(filepath.Join(containersRoot, c.Path))
-		for _, imp := range c.Imports {
-			resolved := filepath.Join(containerDir, imp.Ref)
-			if _, err := os.Stat(resolved); os.IsNotExist(err) {
-				errs = append(errs, ValidationError{
-					File:    c.Path,
-					Line:    imp.Line,
-					Message: fmt.Sprintf("$ref %q not found", imp.Ref),
-				})
-			}
-		}
-	}
-	return errs
 }

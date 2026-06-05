@@ -86,7 +86,6 @@ states:
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// should have baseline (from top-level specs) + dark-mode
 	if len(c.States) != 2 {
 		t.Fatalf("expected 2 states, got %d", len(c.States))
 	}
@@ -153,7 +152,7 @@ states:
 	}
 }
 
-func TestParseContainer_Imports(t *testing.T) {
+func TestParseContainer_ContainerRefs(t *testing.T) {
 	f := writeTempFile(t, `
 specs:
   title: Hello
@@ -165,64 +164,12 @@ containers:
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(c.Imports) != 2 {
-		t.Fatalf("expected 2 imports, got %d", len(c.Imports))
-	}
-	if c.Imports[0].Ref != "./noteInput.yml" {
-		t.Errorf("expected './noteInput.yml', got %q", c.Imports[0].Ref)
-	}
-	if c.Imports[1].Ref != "../shared/hero.yml" {
-		t.Errorf("expected '../shared/hero.yml', got %q", c.Imports[1].Ref)
+	if len(c.Containers) != 2 {
+		t.Fatalf("expected 2 container stubs, got %d", len(c.Containers))
 	}
 }
 
-func TestParseContainer_StateLineNumbers(t *testing.T) {
-	f := writeTempFile(t, `states:
-  - ref: baseline
-    specs:
-      color: red
-  - ref: dark-mode
-    specs:
-      color: black
-`)
-	c, err := spec.ParseContainer(f)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(c.States) != 2 {
-		t.Fatalf("expected 2 states, got %d", len(c.States))
-	}
-	if c.States[0].Line == 0 {
-		t.Error("expected non-zero line for first state")
-	}
-	if c.States[1].Line <= c.States[0].Line {
-		t.Errorf("expected dark-mode line (%d) > baseline line (%d)", c.States[1].Line, c.States[0].Line)
-	}
-}
-
-func TestParseContainer_ImportLineNumbers(t *testing.T) {
-	f := writeTempFile(t, `specs:
-  title: Hello
-containers:
-  - $ref: './a.yml'
-  - $ref: './b.yml'
-`)
-	c, err := spec.ParseContainer(f)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(c.Imports) != 2 {
-		t.Fatalf("expected 2 imports, got %d", len(c.Imports))
-	}
-	if c.Imports[0].Line == 0 {
-		t.Error("expected non-zero line for first import")
-	}
-	if c.Imports[1].Line <= c.Imports[0].Line {
-		t.Errorf("expected second import line (%d) > first (%d)", c.Imports[1].Line, c.Imports[0].Line)
-	}
-}
-
-func TestParseContainer_NoImports(t *testing.T) {
+func TestParseContainer_NoContainers(t *testing.T) {
 	f := writeTempFile(t, `
 specs:
   title: Hello
@@ -231,8 +178,31 @@ specs:
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(c.Imports) != 0 {
-		t.Errorf("expected no imports, got %d", len(c.Imports))
+	if len(c.Containers) != 0 {
+		t.Errorf("expected no containers, got %d", len(c.Containers))
+	}
+}
+
+func TestParseContainer_InlineContainer(t *testing.T) {
+	f := writeTempFile(t, `
+title: Screen
+containers:
+  - title: Header
+    specs:
+      label: My App
+`)
+	c, err := spec.ParseContainer(f)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(c.Containers) != 1 {
+		t.Fatalf("expected 1 inline container, got %d", len(c.Containers))
+	}
+	if c.Containers[0].Title != "Header" {
+		t.Errorf("expected title 'Header', got %q", c.Containers[0].Title)
+	}
+	if v := c.Containers[0].States[0].Specs["label"].Value; v != "My App" {
+		t.Errorf("expected label 'My App', got %q", v)
 	}
 }
 
@@ -359,7 +329,6 @@ states:
 func TestLoadContainers(t *testing.T) {
 	dir := t.TempDir()
 
-	// leaf container
 	leaf := filepath.Join(dir, "app", "home-tab", "feed-screen")
 	if err := os.MkdirAll(leaf, 0755); err != nil {
 		t.Fatal(err)
@@ -369,7 +338,6 @@ specs:
   background-color: "#FFFFFF"
 `)
 
-	// non-leaf with index.yml
 	writeFile(t, filepath.Join(dir, "app", "index.yml"), `
 states:
   - ref: default
@@ -383,5 +351,61 @@ states:
 	}
 	if len(containers) != 2 {
 		t.Errorf("expected 2 containers, got %d", len(containers))
+	}
+}
+
+func TestLoadContainerTree_ResolvesRef(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "hero.yml"), `
+title: Hero
+specs:
+  headerText: Hello
+`)
+	writeFile(t, filepath.Join(dir, "screen.yml"), `
+title: Screen
+containers:
+  - $ref: ./hero.yml
+`)
+
+	c, err := spec.LoadContainerTree(filepath.Join(dir, "screen.yml"), dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(c.Containers) != 1 {
+		t.Fatalf("expected 1 resolved container, got %d", len(c.Containers))
+	}
+	if c.Containers[0].Title != "Hero" {
+		t.Errorf("expected title 'Hero', got %q", c.Containers[0].Title)
+	}
+	if v := c.Containers[0].States[0].Specs["headerText"].Value; v != "Hello" {
+		t.Errorf("expected headerText 'Hello', got %q", v)
+	}
+}
+
+func TestLoadContainerTree_AppliesOverrides(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "button.yml"), `
+title: Button
+specs:
+  label: Click
+  color: blue
+`)
+	writeFile(t, filepath.Join(dir, "screen.yml"), `
+title: Screen
+containers:
+  - $ref: ./button.yml
+    label: OK
+`)
+
+	c, err := spec.LoadContainerTree(filepath.Join(dir, "screen.yml"), dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	btn := c.Containers[0]
+	if v := btn.States[0].Specs["label"].Value; v != "OK" {
+		t.Errorf("override label: want 'OK', got %q", v)
+	}
+	if v := btn.States[0].Specs["color"].Value; v != "blue" {
+		t.Errorf("inherited color: want 'blue', got %q", v)
 	}
 }
