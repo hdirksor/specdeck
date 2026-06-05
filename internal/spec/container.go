@@ -57,6 +57,35 @@ type Container struct {
 	rawOverrides map[string]SpecValue
 }
 
+func (c Container) MarshalYAML() (interface{}, error) {
+	type stateOut struct {
+		Specs map[string]SpecValue `yaml:"specs,omitempty"`
+	}
+	type marshalForm struct {
+		Title       string               `yaml:"title"`
+		Description string               `yaml:"description,omitempty"`
+		States      map[string]stateOut  `yaml:"states,omitempty"`
+		Containers  []Container          `yaml:"containers,omitempty"`
+		Events      []Event              `yaml:"events,omitempty"`
+	}
+
+	var states map[string]stateOut
+	if resolved := resolveStateSpecs(c); len(resolved) > 0 {
+		states = make(map[string]stateOut, len(resolved))
+		for name, specs := range resolved {
+			states[name] = stateOut{Specs: specs}
+		}
+	}
+
+	return marshalForm{
+		Title:       c.Title,
+		Description: c.Description,
+		States:      states,
+		Containers:  c.Containers,
+		Events:      c.Events,
+	}, nil
+}
+
 // containerFile is the raw YAML structure for a container file.
 type containerFile struct {
 	Title       string  `yaml:"title"`

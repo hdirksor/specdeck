@@ -37,59 +37,7 @@ func resolveStateSpecs(c Container) map[string]map[string]SpecValue {
 	return result
 }
 
-type builtContainerOutput struct {
-	Title       string                 `yaml:"title"`
-	Description string                 `yaml:"description,omitempty"`
-	States      map[string]stateOutput `yaml:"states,omitempty"`
-	Containers  []sectionOutput        `yaml:"containers,omitempty"`
-	Events      []Event                `yaml:"events,omitempty"`
-}
-
-type stateOutput struct {
-	Specs map[string]SpecValue `yaml:"specs,omitempty"`
-}
-
-type sectionOutput struct {
-	Title      string                 `yaml:"title"`
-	States     map[string]stateOutput `yaml:"states,omitempty"`
-	Containers []sectionOutput        `yaml:"containers,omitempty"`
-	Events     []Event                `yaml:"events,omitempty"`
-}
-
-func statesToOutput(states map[string]map[string]SpecValue) map[string]stateOutput {
-	if len(states) == 0 {
-		return nil
-	}
-	out := make(map[string]stateOutput, len(states))
-	for name, specs := range states {
-		out[name] = stateOutput{Specs: specs}
-	}
-	return out
-}
-
-func buildSectionOutput(c Container) sectionOutput {
-	sec := sectionOutput{
-		Title:  c.Title,
-		States: statesToOutput(resolveStateSpecs(c)),
-		Events: c.Events,
-	}
-	for _, sub := range c.Containers {
-		sec.Containers = append(sec.Containers, buildSectionOutput(sub))
-	}
-	return sec
-}
-
 func WriteBuiltContainer(path string, c Container) error {
-	out := builtContainerOutput{
-		Title:       c.Title,
-		Description: c.Description,
-		States:      statesToOutput(resolveStateSpecs(c)),
-		Events:      c.Events,
-	}
-	for _, sub := range c.Containers {
-		out.Containers = append(out.Containers, buildSectionOutput(sub))
-	}
-
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return fmt.Errorf("creating directory: %w", err)
 	}
@@ -101,5 +49,5 @@ func WriteBuiltContainer(path string, c Container) error {
 
 	enc := yaml.NewEncoder(f)
 	enc.SetIndent(2)
-	return enc.Encode(out)
+	return enc.Encode(c)
 }
