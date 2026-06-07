@@ -6,33 +6,19 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/hdickson/specdeck/internal/spec"
+	"github.com/hdickson/specdeck/internal/build"
 	"github.com/spf13/cobra"
 )
 
-// dirTitle converts a directory name like "note-list" to "Note List".
-func dirTitle(name string) string {
-	words := strings.FieldsFunc(name, func(r rune) bool { return r == '-' || r == '_' })
-	for i, w := range words {
-		if len(w) > 0 {
-			words[i] = strings.ToUpper(w[:1]) + w[1:]
-		}
-	}
-	return strings.Join(words, " ")
-}
-
-var buildFormat string
-
 var buildCmd = &cobra.Command{
 	Use:   "build",
-	Short: "Resolve container refs and write flat specs to dist/",
+	Short: "Resolve container refs and write specs to dist/",
 	Args:  cobra.NoArgs,
 	RunE:  runBuild,
 }
 
 func init() {
 	rootCmd.AddCommand(buildCmd)
-	buildCmd.Flags().StringVar(&buildFormat, "format", "markdown", "output format: markdown or yaml")
 }
 
 func runBuild(cmd *cobra.Command, args []string) error {
@@ -42,69 +28,77 @@ func runBuild(cmd *cobra.Command, args []string) error {
 	}
 
 	containersRoot := filepath.Join(root, "containers")
-	containers, err := spec.LoadContainers(containersRoot)
+	containers, err := build.Load(containersRoot)
 	if err != nil {
 		return fmt.Errorf("\U0001F7E5  %w", err)
 	}
 
-	byPath := make(map[string]spec.Container, len(containers))
-	for _, c := range containers {
-		byPath[c.Path] = c
+	if err := build.Validate(containers); err != nil {
+		return fmt.Errorf("\U0001F7E5  %w", err)
 	}
 
 	distRoot := filepath.Join(root, "dist")
-
-	// For markdown builds: track dirs covered by index.yml → _index.md and dirs with only leaf files.
 	sectionDirs := make(map[string]bool)
-	leafDirs := make(map[string]string) // abs dir path → dir base name
+	leafDirs := make(map[string]string)
 
 	for _, c := range containers {
-		ownStates, imports := spec.ResolveContainerSections(c, containersRoot, byPath)
-
 		stem := strings.TrimSuffix(c.Path, filepath.Ext(c.Path))
-		var outPath string
-		var writeErr error
+		relDir := filepath.Dir(stem)
 
-		if buildFormat == "yaml" {
-			outPath = filepath.Join(distRoot, stem+".yml")
-			writeErr = spec.WriteBuiltContainer(outPath, c, ownStates, imports)
+		var outPath string
+		if filepath.Base(stem) == "index" {
+			outPath = filepath.Join(distRoot, relDir, "_index.md")
+			sectionDirs[filepath.Join(distRoot, relDir)] = true
 		} else {
-			relDir := filepath.Dir(stem)
-			if filepath.Base(stem) == "index" {
-				outPath = filepath.Join(distRoot, relDir, "_index.md")
-				sectionDirs[filepath.Join(distRoot, relDir)] = true
-			} else {
-				outPath = filepath.Join(distRoot, stem+".md")
-				if relDir != "." {
-					absParent := filepath.Join(distRoot, relDir)
-					if _, ok := leafDirs[absParent]; !ok {
-						leafDirs[absParent] = filepath.Base(relDir)
-					}
+			outPath = filepath.Join(distRoot, stem+".md")
+			if relDir != "." {
+				absParent := filepath.Join(distRoot, relDir)
+				if _, ok := leafDirs[absParent]; !ok {
+					leafDirs[absParent] = filepath.Base(relDir)
 				}
 			}
-			writeErr = spec.WriteBuiltContainerMarkdown(outPath, c, ownStates, imports)
 		}
 
-		if writeErr != nil {
-			return fmt.Errorf("\U0001F7E5  %s: %w", c.Path, writeErr)
+		if err := build.Write(c, outPath); err != nil {
+			return fmt.Errorf("\U0001F7E5  %s: %w", c.Path, err)
 		}
 		relOut, _ := filepath.Rel(distRoot, outPath)
-		fmt.Printf("\U0001F7E2  dist/%s\n", filepath.ToSlash(relOut))
+		fmt.Printf("\033[32m↳\033[0m  dist/%s\n", filepath.ToSlash(relOut))
 	}
 
-	// Emit _index.md stubs for dirs that have leaf files but no index.yml.
-	if buildFormat == "markdown" {
-		for dir, name := range leafDirs {
-			if sectionDirs[dir] {
-				continue
-			}
-			stubPath := filepath.Join(dir, "_index.md")
-			if err := spec.WriteHugoSectionStub(stubPath, dirTitle(name)); err != nil {
-				return fmt.Errorf("\U0001F7E5  writing section stub for %s: %w", name, err)
-			}
-			fmt.Printf("\U0001F7E2  dist/%s\n", filepath.ToSlash(filepath.Join(name, "_index.md")))
+	for dir, name := range leafDirs {
+		if sectionDirs[dir] {
+			continue
 		}
+		stubPath := filepath.Join(dir, "_index.md")
+		if err := writeHugoSectionStub(stubPath, dirTitle(name)); err != nil {
+			return fmt.Errorf("\U0001F7E5  writing section stub for %s: %w", name, err)
+		}
+		fmt.Printf("\033[32m↳\033[0m  dist/%s\n", filepath.ToSlash(filepath.Join(name, "_index.md")))
 	}
 
 	return nil
+}
+
+func writeHugoSectionStub(path, title string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return fmt.Errorf("creating directory: %w", err)
+	}
+	f, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("creating file: %w", err)
+	}
+	defer f.Close()
+	fmt.Fprintf(f, "---\ntitle: %s\n---\n", title)
+	return nil
+}
+
+func dirTitle(name string) string {
+	words := strings.FieldsFunc(name, func(r rune) bool { return r == '-' || r == '_' })
+	for i, w := range words {
+		if len(w) > 0 {
+			words[i] = strings.ToUpper(w[:1]) + w[1:]
+		}
+	}
+	return strings.Join(words, " ")
 }

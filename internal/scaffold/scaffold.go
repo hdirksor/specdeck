@@ -1,19 +1,12 @@
 package scaffold
 
 import (
-	_ "embed"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/BurntSushi/toml"
 )
-
-//go:embed templates/change-command.md
-var changeCommandTemplate []byte
-
-//go:embed templates/change-template.md
-var changeRecordTemplate []byte
 
 type config struct {
 	Name string `toml:"name"`
@@ -37,10 +30,7 @@ func New(dir, projectName string) error {
 	if err := os.MkdirAll(filepath.Join(dir, "containers"), 0755); err != nil {
 		return fmt.Errorf("creating containers directory: %w", err)
 	}
-	if err := writeStarterFiles(dir); err != nil {
-		return err
-	}
-	return nil
+	return writeStarterFiles(dir)
 }
 
 func writeStarterFiles(dir string) error {
@@ -68,7 +58,21 @@ type: boolean
 		return fmt.Errorf("creating changes directory: %w", err)
 	}
 
-	if err := os.WriteFile(filepath.Join(dir, "changes", "TEMPLATE.md"), changeRecordTemplate, 0644); err != nil {
+	changeTemplate := `# Change title
+
+## What changed
+
+<!-- Describe what spec changes this PR introduces. -->
+
+## Why
+
+<!-- Motivation: user research, product decision, bug fix, etc. -->
+
+## References
+
+<!-- Ticket URL, Slack thread, stakeholder name, etc. -->
+`
+	if err := os.WriteFile(filepath.Join(dir, "changes", "TEMPLATE.md"), []byte(changeTemplate), 0644); err != nil {
 		return fmt.Errorf("writing changes/TEMPLATE.md: %w", err)
 	}
 
@@ -76,7 +80,13 @@ type: boolean
 		return fmt.Errorf("creating .claude/commands directory: %w", err)
 	}
 
-	if err := os.WriteFile(filepath.Join(dir, ".claude", "commands", "change.md"), changeCommandTemplate, 0644); err != nil {
+	changeSkill := `---
+description: Create a new change record for a spec change PR
+---
+
+Run ` + "`specdeck change new \"$ARGUMENTS\"`" + ` from the project root and report the created file path. Then open the file and invite the user to fill in the **What changed**, **Why**, and **References** sections — offer to draft content if the title gives enough context.
+`
+	if err := os.WriteFile(filepath.Join(dir, ".claude", "commands", "change.md"), []byte(changeSkill), 0644); err != nil {
 		return fmt.Errorf("writing .claude/commands/change.md: %w", err)
 	}
 
