@@ -31,9 +31,6 @@ func New(dir, projectName string) error {
 	if err := writeConfig(dir, projectName); err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Join(dir, "states", "facts"), 0755); err != nil {
-		return fmt.Errorf("creating states/facts directory: %w", err)
-	}
 	if err := os.MkdirAll(filepath.Join(dir, "containers"), 0755); err != nil {
 		return fmt.Errorf("creating containers directory: %w", err)
 	}
@@ -44,24 +41,16 @@ func New(dir, projectName string) error {
 }
 
 func writeStarterFiles(dir string) error {
-	starterFact := `name: is-logged-in
-type: boolean
+	starterIndex := `title: App
+specs:
+  is-logged-in: false
+states:
+  - ref: logged-in
+    specs:
+      is-logged-in: true
 `
-	if err := os.WriteFile(filepath.Join(dir, "states", "facts", "is-logged-in.yml"), []byte(starterFact), 0644); err != nil {
-		return fmt.Errorf("writing starter fact: %w", err)
-	}
-
-	starterStates := `- name: default
-  summary: Default state
-  facts:
-    is-logged-in: false
-`
-	if err := os.WriteFile(filepath.Join(dir, "states", "core.yml"), []byte(starterStates), 0644); err != nil {
-		return fmt.Errorf("writing starter states: %w", err)
-	}
-
-	if err := os.WriteFile(filepath.Join(dir, "containers", ".gitkeep"), []byte{}, 0644); err != nil {
-		return fmt.Errorf("writing containers/.gitkeep: %w", err)
+	if err := os.WriteFile(filepath.Join(dir, "containers", "index.yml"), []byte(starterIndex), 0644); err != nil {
+		return fmt.Errorf("writing containers/index.yml: %w", err)
 	}
 
 	if err := os.MkdirAll(filepath.Join(dir, "changes"), 0755); err != nil {

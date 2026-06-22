@@ -20,10 +20,3 @@ func setupProject(t *testing.T) string {
 	return dir
 }
 
-func writeStateFile(t *testing.T, dir, filename, content string) {
-	t.Helper()
-	path := filepath.Join(dir, "states", filename)
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-		t.Fatal(err)
-	}
-}

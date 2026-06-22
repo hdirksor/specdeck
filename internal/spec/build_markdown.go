@@ -112,25 +112,22 @@ func writeEventList(w io.Writer, events []Event, heading string) {
 		if ev.Description != "" {
 			fmt.Fprintf(w, "\n%s\n", ev.Description)
 		}
-		if len(ev.Actions) > 0 {
-			fmt.Fprintf(w, "\n**Actions**\n\n")
-			actionNames := make([]string, 0, len(ev.Actions))
-			for k := range ev.Actions {
-				actionNames = append(actionNames, k)
-			}
-			sort.Strings(actionNames)
-			for _, name := range actionNames {
-				action := ev.Actions[name]
+		if len(ev.Effects) > 0 {
+			fmt.Fprintf(w, "\n**Effects**\n\n")
+			for _, effect := range ev.Effects {
+				name, _ := effect["type"].(string)
 				fmt.Fprintf(w, "- **%s**", name)
-				if len(action) > 0 {
-					fields := make([]string, 0, len(action))
-					for k := range action {
+				fields := make([]string, 0, len(effect))
+				for k := range effect {
+					if k != "type" {
 						fields = append(fields, k)
 					}
+				}
+				if len(fields) > 0 {
 					sort.Strings(fields)
 					parts := make([]string, 0, len(fields))
 					for _, k := range fields {
-						parts = append(parts, fmt.Sprintf("%s: %v", k, action[k]))
+						parts = append(parts, fmt.Sprintf("%s: %v", k, effect[k]))
 					}
 					fmt.Fprintf(w, ": %s", strings.Join(parts, ", "))
 				}

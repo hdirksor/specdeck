@@ -121,9 +121,7 @@ func TestWriteBuiltContainerMarkdown_OwnEvents(t *testing.T) {
 			{
 				Title:       "on-press-enter",
 				Description: "user presses enter",
-				Actions: map[string]spec.Action{
-					"navigate": {"destination": "/jot/tags"},
-				},
+				Effects:     []spec.Effect{{"type": "navigate", "destination": "/jot/tags"}},
 			},
 		},
 	}
@@ -152,10 +150,8 @@ func TestWriteBuiltContainerMarkdown_SectionEvents(t *testing.T) {
 			},
 			Events: []spec.Event{
 				{
-					Title: "on-press-alt-e",
-					Actions: map[string]spec.Action{
-						"open": {"description": "open editor"},
-					},
+					Title:   "on-press-alt-e",
+					Effects: []spec.Effect{{"type": "open", "description": "open editor"}},
 				},
 			},
 		},

@@ -211,13 +211,13 @@ specs:
   formLabelText: Notes
 events:
   - title: on-press-alt-e
-    actions:
-      open:
+    effects:
+      - type: open
         description: open editor
   - title: on-type-space-hash
     description: triggers autocomplete
-    actions:
-      dispatch:
+    effects:
+      - type: dispatch
         job: activate-autocomplete-tags
 `)
 	buildFixture(t, root, "jot/index.yml", `
@@ -326,10 +326,8 @@ func TestWriteBuiltContainer_SectionEvents(t *testing.T) {
 			},
 			Events: []spec.Event{
 				{
-					Title: "on-press-alt-e",
-					Actions: map[string]spec.Action{
-						"open": {"description": "open editor"},
-					},
+					Title:   "on-press-alt-e",
+					Effects: []spec.Effect{{"type": "open", "description": "open editor"}},
 				},
 			},
 		},
@@ -377,9 +375,9 @@ func TestWriteBuiltContainer_Events(t *testing.T) {
 			{
 				Title:       "on-press-enter",
 				Description: "user presses enter",
-				Actions: map[string]spec.Action{
-					"navigate": {"destination": "/jot/tags"},
-					"track":    {"event": "note_submitted"},
+				Effects: []spec.Effect{
+					{"type": "navigate", "destination": "/jot/tags"},
+					{"type": "track", "event": "note_submitted"},
 				},
 			},
 		},
@@ -396,9 +394,9 @@ func TestWriteBuiltContainer_Events(t *testing.T) {
 
 	var out struct {
 		Events []struct {
-			Title       string                 `yaml:"title"`
-			Description string                 `yaml:"description"`
-			Actions     map[string]interface{} `yaml:"actions"`
+			Title       string                   `yaml:"title"`
+			Description string                   `yaml:"description"`
+			Effects     []map[string]interface{} `yaml:"effects"`
 		} `yaml:"events"`
 	}
 	if err := yaml.Unmarshal(data, &out); err != nil {
@@ -415,7 +413,7 @@ func TestWriteBuiltContainer_Events(t *testing.T) {
 	if ev.Description != "user presses enter" {
 		t.Errorf("description: want 'user presses enter', got %q", ev.Description)
 	}
-	if len(ev.Actions) != 2 {
-		t.Errorf("expected 2 actions, got %d", len(ev.Actions))
+	if len(ev.Effects) != 2 {
+		t.Errorf("expected 2 effects, got %d", len(ev.Effects))
 	}
 }

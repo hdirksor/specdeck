@@ -26,28 +26,6 @@ func runValidate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	var allErrs []spec.ValidationError
-
-	factsDir := filepath.Join(root, "states", "facts")
-	validFacts, factErrs := spec.ValidateFactFiles(factsDir)
-	for _, name := range validFacts {
-		fmt.Printf("\U0001F7E2  %s\n", filepath.Join("states", "facts", name))
-	}
-	for i := range factErrs {
-		factErrs[i].File = filepath.Join("states", "facts", factErrs[i].File)
-	}
-	allErrs = append(allErrs, factErrs...)
-
-	statesDir := filepath.Join(root, "states")
-	validStates, stateErrs := spec.ValidateStateFiles(statesDir)
-	for _, name := range validStates {
-		fmt.Printf("\U0001F7E2  %s\n", filepath.Join("states", name))
-	}
-	for i := range stateErrs {
-		stateErrs[i].File = filepath.Join("states", stateErrs[i].File)
-	}
-	allErrs = append(allErrs, stateErrs...)
-
 	containersRoot := filepath.Join(root, "containers")
 	containers, err := spec.LoadContainers(containersRoot)
 	if err != nil {
@@ -68,26 +46,13 @@ func runValidate(cmd *cobra.Command, args []string) error {
 			fmt.Printf("\U0001F7E2  %s\n", path)
 		}
 	}
-	allErrs = append(allErrs, containerErrs...)
 
-	if len(allErrs) == 0 {
-		facts, err := spec.LoadFacts(factsDir)
-		if err != nil {
-			return err
-		}
-		states, err := spec.LoadStates(statesDir)
-		if err != nil {
-			return err
-		}
-		allErrs = append(allErrs, spec.Validate(facts, states, containers)...)
-	}
-
-	for _, e := range allErrs {
+	for _, e := range containerErrs {
 		printValidationError(e)
 	}
 
-	if len(allErrs) > 0 {
-		return fmt.Errorf("%d validation error(s)", len(allErrs))
+	if len(containerErrs) > 0 {
+		return fmt.Errorf("%d validation error(s)", len(containerErrs))
 	}
 	return nil
 }

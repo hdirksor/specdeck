@@ -102,7 +102,7 @@ type sectionOutput struct {
 type eventOutput struct {
 	Title       string            `yaml:"title"`
 	Description string            `yaml:"description,omitempty"`
-	Actions     map[string]Action `yaml:"actions,omitempty"`
+	Effects     []Effect          `yaml:"effects,omitempty"`
 }
 
 func specsToOutput(specs map[string]SpecValue) map[string]specValueOutput {
@@ -143,7 +143,7 @@ func WriteBuiltContainer(path string, c Container, ownStates map[string]map[stri
 			sec.Events = append(sec.Events, eventOutput{
 				Title:       ev.Title,
 				Description: ev.Description,
-				Actions:     ev.Actions,
+				Effects:     ev.Effects,
 			})
 		}
 		out.Sections = append(out.Sections, sec)
@@ -153,7 +153,7 @@ func WriteBuiltContainer(path string, c Container, ownStates map[string]map[stri
 		out.Events = append(out.Events, eventOutput{
 			Title:       ev.Title,
 			Description: ev.Description,
-			Actions:     ev.Actions,
+			Effects:     ev.Effects,
 		})
 	}
 

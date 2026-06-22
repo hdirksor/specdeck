@@ -27,15 +27,15 @@ type StateSpec struct {
 	Events map[string]interface{}
 }
 
-// Action holds the payload fields for a single action type.
-type Action map[string]interface{}
+// Effect holds the payload fields for a single effect type.
+type Effect map[string]interface{}
 
 // Event is a top-level interaction on a container: a trigger name, optional
-// description, and one or more typed actions.
+// description, and an ordered sequence of typed effects.
 type Event struct {
 	Title       string
 	Description string
-	Actions     map[string]Action
+	Effects     []Effect
 }
 
 type Container struct {
@@ -59,9 +59,9 @@ type containerFile struct {
 }
 
 type eventFile struct {
-	Title       string            `yaml:"title"`
-	Description string            `yaml:"description"`
-	Actions     map[string]Action `yaml:"actions"`
+	Title       string   `yaml:"title"`
+	Description string   `yaml:"description"`
+	Effects     []Effect `yaml:"effects"`
 }
 
 type containerRef struct {
@@ -134,7 +134,7 @@ func ParseContainer(path string) (Container, error) {
 		c.Events = append(c.Events, Event{
 			Title:       ef.Title,
 			Description: ef.Description,
-			Actions:     ef.Actions,
+			Effects:     ef.Effects,
 		})
 	}
 

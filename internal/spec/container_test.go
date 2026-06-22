@@ -241,8 +241,8 @@ func TestParseContainer_TopLevelEvents(t *testing.T) {
 events:
   - title: on-press-enter
     description: user presses enter
-    actions:
-      navigate:
+    effects:
+      - type: navigate
         destination: /jot/tags
 `)
 	c, err := spec.ParseContainer(f)
@@ -259,19 +259,19 @@ events:
 	if ev.Description != "user presses enter" {
 		t.Errorf("description: want 'user presses enter', got %q", ev.Description)
 	}
-	if ev.Actions["navigate"]["destination"] != "/jot/tags" {
-		t.Errorf("navigate.destination: want '/jot/tags', got %v", ev.Actions["navigate"]["destination"])
+	if len(ev.Effects) == 0 || ev.Effects[0]["destination"] != "/jot/tags" {
+		t.Errorf("navigate.destination: want '/jot/tags', got %v", ev.Effects)
 	}
 }
 
-func TestParseContainer_TopLevelEvents_MultipleActions(t *testing.T) {
+func TestParseContainer_TopLevelEvents_MultipleEffects(t *testing.T) {
 	f := writeTempFile(t, `
 events:
   - title: on-press-enter
-    actions:
-      navigate:
+    effects:
+      - type: navigate
         destination: /jot/tags
-      track:
+      - type: track
         event: note_submitted
 `)
 	c, err := spec.ParseContainer(f)
@@ -279,11 +279,11 @@ events:
 		t.Fatalf("unexpected error: %v", err)
 	}
 	ev := c.Events[0]
-	if len(ev.Actions) != 2 {
-		t.Fatalf("expected 2 actions, got %d", len(ev.Actions))
+	if len(ev.Effects) != 2 {
+		t.Fatalf("expected 2 effects, got %d", len(ev.Effects))
 	}
-	if ev.Actions["track"]["event"] != "note_submitted" {
-		t.Errorf("track.event: want 'note_submitted', got %v", ev.Actions["track"]["event"])
+	if ev.Effects[1]["event"] != "note_submitted" {
+		t.Errorf("track.event: want 'note_submitted', got %v", ev.Effects[1]["event"])
 	}
 }
 
@@ -291,8 +291,8 @@ func TestParseContainer_TopLevelEvents_NoPayload(t *testing.T) {
 	f := writeTempFile(t, `
 events:
   - title: on-dismiss
-    actions:
-      dismiss:
+    effects:
+      - type: dismiss
 `)
 	c, err := spec.ParseContainer(f)
 	if err != nil {
@@ -301,8 +301,15 @@ events:
 	if len(c.Events) != 1 {
 		t.Fatalf("expected 1 event, got %d", len(c.Events))
 	}
-	if _, ok := c.Events[0].Actions["dismiss"]; !ok {
-		t.Error("expected 'dismiss' action to be present")
+	found := false
+	for _, a := range c.Events[0].Effects {
+		if a["type"] == "dismiss" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected 'dismiss' effect to be present")
 	}
 }
 

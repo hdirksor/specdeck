@@ -43,10 +43,7 @@ func TestNew_CreatesExpectedStructure(t *testing.T) {
 
 	for _, entry := range []string{
 		"specdeck.toml",
-		"states/facts",
-		"states/facts/is-logged-in.yml",
-		"states/core.yml",
-		"containers/.gitkeep",
+		"containers/index.yml",
 		"changes/TEMPLATE.md",
 		".claude/commands/change.md",
 	} {
