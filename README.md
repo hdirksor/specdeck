@@ -7,6 +7,8 @@ Specdeck is designed for use with large-scale, highly stateful projects under ra
 ## Core principles
 
 - Git-Native
+- living spec
+- simple
 
 
 ## Getting Started
