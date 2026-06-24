@@ -13,7 +13,7 @@ import (
 // open/close inventory (inline {{if}}...{{end}} on one line not counted):
 //  opens:  range(outer) if(desc) if(behavior) range(behavior) if(specs) range(specs)
 //          range(states) if(desc) range(specs)
-//          if(events) range(events) range(actions)
+//          if(events) range(events) range(effects)
 //  closes: end×12 — one per open above
 const markdownTmpl = `{{- range .}}
 {{.Heading}} {{.Title}}
@@ -60,7 +60,7 @@ const markdownTmpl = `{{- range .}}
 
 {{- range .Events}}
 **{{.Title}}**{{if .Description}} — {{.Description}}{{end}}
-{{- range .Actions}}
+{{- range .Effects}}
 - {{.Title}}{{if .Description}}: {{.Description}}{{end}}
 {{- end}}
 

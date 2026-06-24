@@ -106,7 +106,7 @@ title: Form
 events:
   - title: submit
     description: User taps submit.
-    actions:
+    effects:
       - title: save
         description: Persist the form data.
       - title: navigate
@@ -125,14 +125,14 @@ events:
 	if ev.Description != "User taps submit." {
 		t.Errorf("event description: want %q, got %q", "User taps submit.", ev.Description)
 	}
-	if len(ev.Actions) != 2 {
-		t.Fatalf("actions: want 2, got %d", len(ev.Actions))
+	if len(ev.Effects) != 2 {
+		t.Fatalf("effects: want 2, got %d", len(ev.Effects))
 	}
-	if ev.Actions[0].Title != "save" {
-		t.Errorf("action[0] title: want %q, got %q", "save", ev.Actions[0].Title)
+	if ev.Effects[0].Title != "save" {
+		t.Errorf("effect[0] title: want %q, got %q", "save", ev.Effects[0].Title)
 	}
-	if ev.Actions[0].Description != "Persist the form data." {
-		t.Errorf("action[0] description: want %q, got %q", "Persist the form data.", ev.Actions[0].Description)
+	if ev.Effects[0].Description != "Persist the form data." {
+		t.Errorf("effect[0] description: want %q, got %q", "Persist the form data.", ev.Effects[0].Description)
 	}
 }
 

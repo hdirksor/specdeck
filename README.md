@@ -50,7 +50,7 @@ states:
 events:
   - title: submit
     description: Emitted by the submit button when input is not blank.
-    actions:
+    effects:
       - title: save note
         description: Persist the trimmed input text.
       - title: clear input
@@ -69,7 +69,7 @@ containers:
 
 **`states`** each carry their own `specs` that override the container's base specs for that state. A state with no specs of its own inherits the base specs unchanged.
 
-**`events`** describe interactions. Each event has a `title`, optional `description`, and a list of `actions` (each with `title` and optional `description`).
+**`events`** describe interactions. Each event has a `title`, optional `description`, and a list of `effects` (each with `title` and optional `description`).
 
 **`containers`** can be `$ref` imports, inline definitions, or a mix. `$ref` entries accept an optional `overrides:` map to patch individual specs in the imported container.
 
