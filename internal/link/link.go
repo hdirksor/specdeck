@@ -19,40 +19,27 @@ type config struct {
 //go:embed skills
 var skillsFS embed.FS
 
-// Link writes specdeck.yml and the Claude Code skills into dir.
-// specsPath is the local path to the specs repo; it may be empty.
+// Link installs Claude Code skills into dir. If specdeck.yml or specdeck.toml
+// already exists the config file is left untouched; otherwise specdeck.yml is
+// created with specsPath as the specs_repo value.
 func Link(dir, specsPath string) error {
-	if err := writeConfig(dir, specsPath); err != nil {
-		return err
+	if !configExists(dir) {
+		if err := writeConfig(dir, specsPath); err != nil {
+			return err
+		}
 	}
 	return writeSkills(dir)
 }
 
-// Sync re-writes all Claude Code skill files to the current version without
-// changing the specs_repo path in specdeck.yml. Returns an error if
-// specdeck.yml does not exist.
-func Sync(dir string) error {
-	cfg, err := readConfig(dir)
-	if err != nil {
-		return fmt.Errorf("reading specdeck.yml: %w — run `specdeck link` first", err)
+func configExists(dir string) bool {
+	for _, name := range []string{"specdeck.yml", "specdeck.toml"} {
+		if _, err := os.Stat(filepath.Join(dir, name)); err == nil {
+			return true
+		}
 	}
-	if err := writeConfig(dir, cfg.SpecsRepo); err != nil {
-		return err
-	}
-	return writeSkills(dir)
+	return false
 }
 
-func readConfig(dir string) (config, error) {
-	data, err := os.ReadFile(filepath.Join(dir, "specdeck.yml"))
-	if err != nil {
-		return config{}, err
-	}
-	var cfg config
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return config{}, err
-	}
-	return cfg, nil
-}
 
 func writeConfig(dir, specsPath string) error {
 	f, err := os.Create(filepath.Join(dir, "specdeck.yml"))
@@ -67,9 +54,9 @@ func writeConfig(dir, specsPath string) error {
 }
 
 func writeSkills(dir string) error {
-	commandsDir := filepath.Join(dir, ".claude", "commands")
+	commandsDir := filepath.Join(dir, ".claude", "commands", "specdeck")
 	if err := os.MkdirAll(commandsDir, 0755); err != nil {
-		return fmt.Errorf("creating .claude/commands: %w", err)
+		return fmt.Errorf("creating .claude/commands/specdeck: %w", err)
 	}
 
 	entries, err := skillsFS.ReadDir("skills")
