@@ -130,7 +130,7 @@ func TestWrite_Events(t *testing.T) {
 			{
 				Title:       "submit",
 				Description: "User taps submit.",
-				Actions: []build.Action{
+				Effects: []build.Effect{
 					{Title: "save", Description: "Persist data."},
 					{Title: "navigate"},
 				},

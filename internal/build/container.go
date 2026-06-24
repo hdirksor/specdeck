@@ -28,10 +28,10 @@ type State struct {
 type Event struct {
 	Title       string   `yaml:"title"`
 	Description string   `yaml:"description,omitempty"`
-	Actions     []Action `yaml:"actions,omitempty"`
+	Effects     []Effect `yaml:"effects,omitempty"`
 }
 
-type Action struct {
+type Effect struct {
 	Title       string `yaml:"title"`
 	Description string `yaml:"description,omitempty"`
 }
