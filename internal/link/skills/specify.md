@@ -4,13 +4,13 @@ Read `specdeck.yml` in the project root to find the `specs_repo` path.
 
 ## Step 1 — Orient on the branch
 
-Run `git branch --show-current` and show the user the current branch. Ask: "Continue adding specs on this branch, or create a new branch?"
+Run `git -C <specs_repo> branch --show-current` and show the user the current branch. Ask: "Continue adding specs on this branch, or create a new branch?"
 
 If the user wants a new branch:
 - Propose a kebab-case branch name based on $ARGUMENTS or what the user describes.
 - Ask the user to confirm or adjust the name before creating it.
-- Check if the working tree is dirty (`git status --porcelain`). If it is, warn the user: "The working tree has uncommitted changes. Create the new branch from this state, or stop and clean up first?" If they want to proceed, continue on the current dirty branch — do not create a new branch.
-- If the tree is clean, create and switch to the new branch.
+- Check if the working tree is dirty (`git -C <specs_repo> status --porcelain`). If it is, warn the user: "The working tree has uncommitted changes. Create the new branch from this state, or stop and clean up first?" If they want to proceed, continue on the current dirty branch — do not create a new branch.
+- If the tree is clean, create and switch to the new branch (`git -C <specs_repo> checkout -b <branch-name>`).
 - Create `INTENT.md` in `specs_repo` with the following stub, then ask the user to describe the goal of this branch. Fill in their answer and commit the file.
 
 ```markdown
@@ -58,12 +58,37 @@ After drafting, explicitly list what you are *not* speccing and why — e.g. "Sk
 
 ## Step 5 — Write and commit
 
-Write the spec file(s) to `specs_repo` under kebab-case filenames matching the feature (e.g. `user-login.md`).
+Write specs as `.yml` files inside `specs_repo/containers/`, in an appropriate subdirectory matching the feature area (e.g. `containers/app/user-login/index.yml`). Each distinct container — screen, panel, or reusable component — gets its own `.yml` file. A parent container references its children via `$ref` entries in its `containers` list rather than inlining them.
 
-Stage and commit the new or updated spec files with a short message describing what was specced.
+Use the container schema. Only populate fields for which the input provides explicit evidence:
+
+```yaml
+title: <human-readable name>
+description: >
+  <optional: one-paragraph summary of purpose>
+behavior:
+  - <observable behaviour statement>
+specs:
+  <property>: <value>   # visual or structural constraints
+states:
+  - title: <state name>
+    description: <optional>
+    specs:
+      <property>: <value>
+events:
+  - title: <event name>
+    description: <optional>
+    effects:
+      - title: <effect name>
+        description: <what changes>
+containers:
+  - $ref: '<relative path to child container yml>'
+```
+
+Stage and commit the new or updated spec files inside `specs_repo` with a short message describing what was specced. All `git add` and `git commit` commands must use `git -C <specs_repo>`.
 
 Then ask the user: "Are you done with spec changes on this branch, or do you plan to add more?"
 
-If done: delete `INTENT.md` from `specs_repo`, stage the deletion, and commit it with the message `chore: remove INTENT.md before merge`. The branch is now ready to merge.
+If done: delete `INTENT.md` from `specs_repo`, stage the deletion, and commit it (using `git -C <specs_repo>`) with the message `chore: remove INTENT.md before merge`. The branch is now ready to merge.
 
 If not done: leave `INTENT.md` in place.
