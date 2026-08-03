@@ -115,3 +115,7 @@ specdeck link ../my-app-specs
 ### `specdeck sync`
 
 Re-writes the Claude Code skill files to the current specdeck version without changing `specdeck.yml`. Run this after upgrading specdeck.
+
+## License
+
+MIT
