@@ -144,6 +144,23 @@ func TestWrite_Events(t *testing.T) {
 	assertContains(t, got, "- navigate")
 }
 
+func TestWrite_EffectWithoutTitle(t *testing.T) {
+	got := writeOut(t, build.Container{
+		Title: "Card",
+		Events: []build.Event{
+			{
+				Title:       "tapped",
+				Description: "Emitted when the user taps the card.",
+				Effects: []build.Effect{
+					{Description: "Opens the note entity screen for this note."},
+				},
+			},
+		},
+	})
+	assertContains(t, got, "- Opens the note entity screen for this note.")
+	assertNotContains(t, got, "- : Opens the note entity screen for this note.")
+}
+
 func TestWrite_SubContainerHeadingLevel(t *testing.T) {
 	got := writeOut(t, build.Container{
 		Title: "Screen",
@@ -184,6 +201,45 @@ func TestWrite_SubContainerEvents(t *testing.T) {
 	})
 	assertContains(t, got, "### Events")
 	assertContains(t, got, "**on-press**")
+}
+
+func TestWrite_ImageRendersAtTop(t *testing.T) {
+	got := writeOut(t, build.Container{
+		Title:       "Screen",
+		Path:        filepath.Join("app", "shared", "screen.yml"),
+		Image:       "screen.png",
+		Description: "A screen.",
+	})
+	assertContains(t, got, "![Screen](/app/shared/screen.png)")
+
+	imgIdx := strings.Index(got, "![Screen](/app/shared/screen.png)")
+	descIdx := strings.Index(got, "A screen.")
+	if imgIdx == -1 || descIdx == -1 || imgIdx > descIdx {
+		t.Errorf("expected image before description:\n%s", got)
+	}
+}
+
+func TestWrite_ImagePathIsRootRelative(t *testing.T) {
+	got := writeOut(t, build.Container{
+		Title: "Nav Bar",
+		Path:  filepath.Join("app", "shared", "nav-bar.yml"),
+		Image: "nav-bar.png",
+	})
+	assertContains(t, got, "![Nav Bar](/app/shared/nav-bar.png)")
+}
+
+func TestWrite_ImagePathAtContainersRoot(t *testing.T) {
+	got := writeOut(t, build.Container{
+		Title: "Screen",
+		Path:  "screen.yml",
+		Image: "screen.png",
+	})
+	assertContains(t, got, "![Screen](/screen.png)")
+}
+
+func TestWrite_NoImageTagWhenEmpty(t *testing.T) {
+	got := writeOut(t, build.Container{Title: "Screen"})
+	assertNotContains(t, got, "![")
 }
 
 func TestWrite_CreatesNestedDirectories(t *testing.T) {

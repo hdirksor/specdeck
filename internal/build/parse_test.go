@@ -136,6 +136,36 @@ events:
 	}
 }
 
+func TestParseFile_EffectShorthand(t *testing.T) {
+	f := writeTempFile(t, `
+title: Note Card
+events:
+  - title: delete
+    description: User taps delete.
+    effects:
+      - Permanently deletes this note from storage.
+      - title: refresh-list
+        description: Updates the note list.
+`)
+	c, err := build.ParseFile(f)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	ev := c.Events[0]
+	if len(ev.Effects) != 2 {
+		t.Fatalf("effects: want 2, got %d", len(ev.Effects))
+	}
+	if ev.Effects[0].Title != "" {
+		t.Errorf("effect[0] title: want empty, got %q", ev.Effects[0].Title)
+	}
+	if ev.Effects[0].Description != "Permanently deletes this note from storage." {
+		t.Errorf("effect[0] description: want %q, got %q", "Permanently deletes this note from storage.", ev.Effects[0].Description)
+	}
+	if ev.Effects[1].Title != "refresh-list" {
+		t.Errorf("effect[1] title: want %q, got %q", "refresh-list", ev.Effects[1].Title)
+	}
+}
+
 func TestParseFile_RefStubsNotResolved(t *testing.T) {
 	f := writeTempFile(t, `
 title: Screen
@@ -332,6 +362,83 @@ containers:
 	}
 	if btn.Containers[0].Title != "Icon" {
 		t.Errorf("nested ref title: want %q, got %q", "Icon", btn.Containers[0].Title)
+	}
+}
+
+func TestLoad_SetsImage(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "screen.yml"), `title: Screen`)
+	writeFile(t, filepath.Join(dir, "screen.png"), `fake-png-bytes`)
+
+	containers, err := build.Load(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(containers) != 1 {
+		t.Fatalf("want 1 container, got %d", len(containers))
+	}
+	if containers[0].Image != "screen.png" {
+		t.Errorf("image: want %q, got %q", "screen.png", containers[0].Image)
+	}
+}
+
+func TestLoad_NoImageWhenNoSiblingFile(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "screen.yml"), `title: Screen`)
+
+	containers, err := build.Load(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if containers[0].Image != "" {
+		t.Errorf("image: want empty, got %q", containers[0].Image)
+	}
+}
+
+func TestLoad_AmbiguousImageErrors(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "screen.yml"), `title: Screen`)
+	writeFile(t, filepath.Join(dir, "screen.png"), `fake-png-bytes`)
+	writeFile(t, filepath.Join(dir, "screen.svg"), `fake-svg-bytes`)
+
+	_, err := build.Load(dir)
+	if err == nil {
+		t.Fatal("expected error for ambiguous image, got nil")
+	}
+}
+
+func TestLoad_NestedRefHasNoImage(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "hero.yml"), `title: Hero`)
+	writeFile(t, filepath.Join(dir, "hero.png"), `fake-png-bytes`)
+	writeFile(t, filepath.Join(dir, "screen.yml"), `
+title: Screen
+containers:
+  - $ref: ./hero.yml
+`)
+
+	containers, err := build.Load(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var hero, screen build.Container
+	for _, c := range containers {
+		switch c.Title {
+		case "Hero":
+			hero = c
+		case "Screen":
+			screen = c
+		}
+	}
+	if hero.Image != "hero.png" {
+		t.Errorf("standalone hero image: want %q, got %q", "hero.png", hero.Image)
+	}
+	if len(screen.Containers) != 1 {
+		t.Fatalf("screen.containers: want 1, got %d", len(screen.Containers))
+	}
+	if screen.Containers[0].Image != "" {
+		t.Errorf("nested hero image: want empty, got %q", screen.Containers[0].Image)
 	}
 }
 

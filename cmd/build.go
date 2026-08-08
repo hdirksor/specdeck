@@ -62,6 +62,9 @@ func runBuild(cmd *cobra.Command, args []string) error {
 		if err := build.Write(c, outPath); err != nil {
 			return fmt.Errorf("\U0001F7E5  %s: %w", c.Path, err)
 		}
+		if err := build.CopyImage(c, containersRoot, filepath.Dir(outPath)); err != nil {
+			return fmt.Errorf("\U0001F7E5  %s: %w", c.Path, err)
+		}
 		relOut, _ := filepath.Rel(distRoot, outPath)
 		fmt.Printf("\033[32m↳\033[0m  dist/%s\n", filepath.ToSlash(relOut))
 	}

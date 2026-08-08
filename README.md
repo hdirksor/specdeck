@@ -88,6 +88,21 @@ Paths are relative to the current file. `build` resolves all refs recursively be
 
 A directory that also carries specs of its own uses an `index.yml` file. In the built output this becomes `_index.md` (Hugo section page).
 
+### Images
+
+Drop an image next to a container's YAML file, matching its filename stem, and `build` embeds it at the top of that container's section and copies it alongside the generated markdown:
+
+```
+containers/
+  screen-one/
+    index.yml
+    index.png    # rendered at the top of screen-one/_index.md
+```
+
+Supported extensions: `.png`, `.jpg`, `.jpeg`, `.gif`, `.svg`, `.webp`. If more than one matches the same stem (e.g. `index.png` and `index.svg`), `build` fails with an ambiguous-image error — remove one.
+
+This only applies to a container's own file. A container embedded elsewhere via `$ref` does not carry its image into the importing container's output.
+
 ## Command Line and Agentic Use
 
 ### `specdeck new [name]`
