@@ -1,5 +1,6 @@
 # Specdeck
 
+<<<<<<< HEAD
 A spec-management tool for making robust specs with minimal fuss.
 
 Specdeck is designed with large-scale projects under continuous development in mind.
@@ -17,6 +18,7 @@ Specdeck can be installed by running
 
 A Specdeck project is designed to exist as a standalone git repository. To get started run `specdeck new` in a directory. This will create: 
 
+<<<<<<< HEAD
 - `specdeck.toml`
 - `containers/`
 
@@ -47,5 +49,4 @@ Specdeck is built on a recursive type system with `Container` being the core. Ea
 - `specdeck validate` — Validate cross-references in the specdeck project.
 - `specdeck change new <title>` — Create a new change record in `changes/`.
 - `specdeck sync` — Re-write all Claude Code skill files without changing `specdeck.yml` configuration.
-
 
