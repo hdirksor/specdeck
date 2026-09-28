@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/hdickson/specdeck/internal/build"
+	"github.com/hdirksor/specdeck/internal/build"
 	"github.com/spf13/cobra"
 )
 

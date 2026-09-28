@@ -3,7 +3,7 @@ package build_test
 import (
 	"testing"
 
-	"github.com/hdickson/specdeck/internal/build"
+	"github.com/hdirksor/specdeck/internal/build"
 )
 
 func TestValidate_Noop(t *testing.T) {

@@ -1,4 +1,4 @@
-module github.com/hdickson/specdeck
+module github.com/hdirksor/specdeck
 
 go 1.25.0
 
