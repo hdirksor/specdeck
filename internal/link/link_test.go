@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hdickson/specdeck/internal/link"
+	"github.com/hdirksor/specdeck/internal/link"
 )
 
 func TestLink_CreatesSpecdeckYML_WithPath(t *testing.T) {

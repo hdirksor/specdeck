@@ -4,7 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hdickson/specdeck/internal/scaffold"
+	"github.com/hdirksor/specdeck/internal/scaffold"
 	"github.com/spf13/cobra"
 )
 

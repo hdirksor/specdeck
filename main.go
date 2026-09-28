@@ -1,6 +1,6 @@
 package main
 
-import "github.com/hdickson/specdeck/cmd"
+import "github.com/hdirksor/specdeck/cmd"
 
 func main() {
 	cmd.Execute()

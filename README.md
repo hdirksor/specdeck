@@ -1,24 +1,22 @@
 # Specdeck
 
-<<<<<<< HEAD
 A spec-management tool for making robust specs with minimal fuss.
 
 Specdeck is designed with large-scale projects under continuous development in mind.
 
 ## Overview
 
-Spececk is a command line tool written in Go to manage specs. At its core, Specdeck enforces an opinionated approach to writing specs. So in a sense, Specdeck is also that specific approach to writing specs. See more about this approach in [writing specs with SpecDeck.](#writing-specs)
+Specdeck is a command line tool written in Go to manage specs. At its core, Specdeck enforces an opinionated approach to writing specs. So in a sense, Specdeck is also that specific approach to writing specs. See more about this approach in [writing specs with SpecDeck.](#writing-specs)
 
 ## Installation:
 
 Specdeck can be installed by running 
-`go get hdirksor/specdeck`
+`go install github.com/hdirksor/specdeck@latest`
 
 ## Getting Started
 
 A Specdeck project is designed to exist as a standalone git repository. To get started run `specdeck new` in a directory. This will create: 
 
-<<<<<<< HEAD
 - `specdeck.toml`
 - `containers/`
 
@@ -30,16 +28,15 @@ As a tool designed to help spec continuously developed projects it is only right
 
 ## Agentic Use
 
-If you are using Claude, running `specdeck link` will create two new commands in your claude configuration. 
+If you are using Claude, running `specdeck link` will install two Claude Code commands in `.claude/commands/`:
 
-- `/specdeck spec` can be used to point Specdeck to specific code or documentation and begin generating specs from it. 
+- `/specify` — point Claude at specific code or documentation and it will draft a spec document from it.
 
-- `/specdeck build` can be used to point Claude to specific parts of your spec to begin building.
+- `/change` — create a new change record for a spec change, and have Claude fill it in from context.
 
 ## Types
 
-Specdeck is built on a recursive type system with `Container` being the core. Each container may have many or no child `Containers`.<D-s>
-
+Specdeck is built on a recursive type system with `Container` being the core. Each container may have many or no child `Containers`.
 
 ## Commands
 
@@ -50,3 +47,6 @@ Specdeck is built on a recursive type system with `Container` being the core. Ea
 - `specdeck change new <title>` — Create a new change record in `changes/`.
 - `specdeck sync` — Re-write all Claude Code skill files without changing `specdeck.yml` configuration.
 
+## License
+
+MIT
