@@ -1,5 +1,7 @@
 # Specdeck
 
+[![codecov](https://codecov.io/gh/hdirksor/specdeck/graph/badge.svg)](https://codecov.io/gh/hdirksor/specdeck)
+
 A spec-management tool for making robust specs with minimal fuss.
 
 Specdeck is designed with large-scale projects under continuous development in mind.
