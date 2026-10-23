@@ -10,10 +10,8 @@ Commands:
 
 	new        Initialise a new specdeck project in the current directory
 	link       Link a code repository to a specdeck specs repo
+	agents     Install or update specdeck's commands for AI coding agents
 	build      Resolve container refs and write flat specs to dist/
-	validate   Validate cross-references in the specdeck project
-	change     Manage change records
-	sync       Update Claude Code skills to the current specdeck version
 */
 package main
 
