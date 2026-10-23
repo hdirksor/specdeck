@@ -11,10 +11,11 @@ import (
 )
 
 // open/close inventory (inline {{if}}...{{end}} on one line not counted):
-//  opens:  range(outer) if(image) if(desc) if(behavior) range(behavior) if(specs) range(specs)
-//          range(states) if(desc) range(specs)
-//          if(events) range(events) range(effects)
-//  closes: end×13 — one per open above
+//
+//	opens:  range(outer) if(image) if(desc) if(behavior) range(behavior) if(specs) range(specs)
+//	        range(states) if(desc) range(specs)
+//	        if(events) range(events) range(effects)
+//	closes: end×13 — one per open above
 const markdownTmpl = `{{- range .}}
 {{.Heading}} {{.Title}}
 {{- if .Image}}

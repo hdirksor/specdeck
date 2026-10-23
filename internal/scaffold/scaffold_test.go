@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/BurntSushi/toml"
 	"github.com/hdirksor/specdeck/internal/scaffold"
+	"gopkg.in/yaml.v3"
 )
 
 // gitDir returns an empty temp directory containing only a .git directory.
@@ -61,7 +61,7 @@ func TestNew_RequiresGitRepo(t *testing.T) {
 	err := scaffold.New(dir, "jot")
 
 	assertErrorContains(t, err, "not a git repository")
-	assertNotExists(t, filepath.Join(dir, "specdeck.toml"))
+	assertNotExists(t, filepath.Join(dir, "specdeck.yml"))
 }
 
 func TestNew_AcceptsGitFile(t *testing.T) {
@@ -85,7 +85,7 @@ func TestNew_RequiresEmptyDir(t *testing.T) {
 	err := scaffold.New(dir, "jot")
 
 	assertErrorContains(t, err, "not empty")
-	assertNotExists(t, filepath.Join(dir, "specdeck.toml"))
+	assertNotExists(t, filepath.Join(dir, "specdeck.yml"))
 }
 
 func TestNew_FailsOnSecondRun(t *testing.T) {
@@ -97,11 +97,15 @@ func TestNew_FailsOnSecondRun(t *testing.T) {
 func TestNew_WritesConfigWithName(t *testing.T) {
 	dir := newProject(t, "jot")
 
-	var cfg struct {
-		Name string `toml:"name"`
+	data, err := os.ReadFile(filepath.Join(dir, "specdeck.yml"))
+	if err != nil {
+		t.Fatalf("reading specdeck.yml: %v", err)
 	}
-	if _, err := toml.DecodeFile(filepath.Join(dir, "specdeck.toml"), &cfg); err != nil {
-		t.Fatalf("decoding specdeck.toml: %v", err)
+	var cfg struct {
+		Name string `yaml:"name"`
+	}
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		t.Fatalf("decoding specdeck.yml: %v", err)
 	}
 	if cfg.Name != "jot" {
 		t.Errorf("name = %q, want %q", cfg.Name, "jot")
@@ -155,4 +159,23 @@ func TestNew_ChangeSkillHasFrontmatter(t *testing.T) {
 	if !strings.HasPrefix(skill, "---\ndescription: ") {
 		t.Errorf("change.md missing description frontmatter, got:\n%s", skill)
 	}
+}
+
+func TestNew_DoesNotWriteTOML(t *testing.T) {
+	dir := newProject(t, "jot")
+
+	assertNotExists(t, filepath.Join(dir, "specdeck.toml"))
+}
+
+func TestNew_ErrorsWhenConfigCannotBeCreated(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root ignores directory permissions")
+	}
+	dir := gitDir(t)
+	if err := os.Chmod(dir, 0555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(dir, 0755) })
+
+	assertErrorContains(t, scaffold.New(dir, "jot"), "creating specdeck.yml")
 }

@@ -5,11 +5,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/BurntSushi/toml"
+	"gopkg.in/yaml.v3"
 )
 
 type config struct {
-	Name string `toml:"name"`
+	Name string `yaml:"name"`
 }
 
 // New initialises a specdeck project in dir with the given project name.
@@ -114,10 +114,13 @@ func requireEmpty(dir string) error {
 }
 
 func writeConfig(dir, projectName string) error {
-	f, err := os.Create(filepath.Join(dir, "specdeck.toml"))
+	f, err := os.Create(filepath.Join(dir, "specdeck.yml"))
 	if err != nil {
-		return fmt.Errorf("creating specdeck.toml: %w", err)
+		return fmt.Errorf("creating specdeck.yml: %w", err)
 	}
 	defer f.Close()
-	return toml.NewEncoder(f).Encode(config{Name: projectName})
+
+	enc := yaml.NewEncoder(f)
+	enc.SetIndent(2)
+	return enc.Encode(config{Name: projectName})
 }

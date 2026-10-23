@@ -66,7 +66,7 @@ func TestNew_UsesNameArg(t *testing.T) {
 	if _, err := run(t, dir, "new", "jot"); err != nil {
 		t.Fatalf("new: %v", err)
 	}
-	assertContains(t, readFile(t, filepath.Join(dir, "specdeck.toml")), `name = "jot"`)
+	assertContains(t, readFile(t, filepath.Join(dir, "specdeck.yml")), "name: jot")
 }
 
 func TestNew_DefaultsNameToDirectory(t *testing.T) {
@@ -75,7 +75,7 @@ func TestNew_DefaultsNameToDirectory(t *testing.T) {
 	if _, err := run(t, dir, "new"); err != nil {
 		t.Fatalf("new: %v", err)
 	}
-	assertContains(t, readFile(t, filepath.Join(dir, "specdeck.toml")), `name = "my-specs"`)
+	assertContains(t, readFile(t, filepath.Join(dir, "specdeck.yml")), "name: my-specs")
 }
 
 func TestNew_ErrorsOutsideGitRepo(t *testing.T) {
@@ -100,7 +100,7 @@ func TestLink_WritesConfigAndSkills(t *testing.T) {
 		t.Fatalf("link: %v", err)
 	}
 	assertContains(t, readFile(t, filepath.Join(dir, "specdeck.yml")), "specs_repo: ../specs")
-	if _, err := os.Stat(filepath.Join(dir, ".claude", "commands", "specify.md")); err != nil {
+	if _, err := os.Stat(filepath.Join(dir, ".claude", "commands", "specdeck", "specify.md")); err != nil {
 		t.Errorf("expected specify skill: %v", err)
 	}
 }
@@ -120,26 +120,22 @@ func TestLink_RejectsExtraArgs(t *testing.T) {
 	}
 }
 
-// -- sync --
-
-func TestSync_ReportsSuccess(t *testing.T) {
+func TestLink_KeepsExistingConfig(t *testing.T) {
 	dir := t.TempDir()
 	if _, err := run(t, dir, "link", "../specs"); err != nil {
 		t.Fatalf("link: %v", err)
 	}
 
-	out, err := run(t, dir, "sync")
-	if err != nil {
-		t.Fatalf("sync: %v", err)
+	if _, err := run(t, dir, "link", "../other"); err != nil {
+		t.Fatalf("re-link: %v", err)
 	}
-	assertContains(t, out, "Skills updated.")
 	assertContains(t, readFile(t, filepath.Join(dir, "specdeck.yml")), "specs_repo: ../specs")
 }
 
-func TestSync_ErrorsWithoutLink(t *testing.T) {
+func TestSync_IsRemoved(t *testing.T) {
 	_, err := run(t, t.TempDir(), "sync")
-	if err == nil || !strings.Contains(err.Error(), "specdeck link") {
-		t.Errorf("expected hint to run specdeck link, got %v", err)
+	if err == nil || !strings.Contains(err.Error(), "unknown command") {
+		t.Errorf("expected unknown command error, got %v", err)
 	}
 }
 
