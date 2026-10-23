@@ -20,6 +20,12 @@ var updateCheckCmd = &cobra.Command{
 	RunE:   runUpdateCheck,
 }
 
+// The release API and the background refresh; tests replace these.
+var (
+	latestReleaseURL = update.LatestReleaseURL
+	startRefresh     = startUpdateCheck
+)
+
 func init() {
 	rootCmd.AddCommand(updateCheckCmd)
 }
@@ -31,21 +37,21 @@ func runUpdateCheck(cmd *cobra.Command, args []string) error {
 	}
 	ctx, cancel := context.WithTimeout(cmd.Context(), update.Timeout)
 	defer cancel()
-	return update.Refresh(ctx, http.DefaultClient, update.LatestReleaseURL, path)
+	return update.Refresh(ctx, http.DefaultClient, latestReleaseURL, path)
 }
 
 // notifyUpdates prints a new-release notice and refreshes the release cache
 // in the background. The update check must never break a command, so its
 // failures are dropped.
 func notifyUpdates(executed *cobra.Command) {
-	if skipUpdateCheck(executed) || !update.Enabled(currentBuild, os.Getenv, isTerminal(os.Stderr)) {
+	if skipUpdateCheck(executed) || !update.Enabled(currentBuild, os.Getenv, stderrIsTerminal()) {
 		return
 	}
 	path, err := updateCachePath()
 	if err != nil {
 		return
 	}
-	_ = update.Notify(os.Stderr, currentBuild, path, time.Now(), startUpdateCheck)
+	_ = update.Notify(stderr, currentBuild, path, time.Now(), startRefresh)
 }
 
 // skipUpdateCheck reports whether executed is a command that should never

@@ -12,14 +12,14 @@ import (
 // notifyStaleCommands tells the user when the agent commands installed in the
 // current directory are older than this version of specdeck.
 func notifyStaleCommands(executed *cobra.Command) {
-	if skipStaleCheck(executed) || !update.Interactive(os.Getenv, isTerminal(os.Stderr)) {
+	if skipStaleCheck(executed) || !update.Interactive(os.Getenv, stderrIsTerminal()) {
 		return
 	}
 	dir, err := os.Getwd()
 	if err != nil {
 		return
 	}
-	fmt.Fprint(os.Stderr, staleCommandsNotice(dir))
+	fmt.Fprint(stderr, staleCommandsNotice(dir))
 }
 
 // skipStaleCheck reports whether executed should not check for stale

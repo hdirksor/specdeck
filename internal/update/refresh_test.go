@@ -103,3 +103,11 @@ func TestRefreshDue(t *testing.T) {
 		}
 	}
 }
+
+func TestRefresh_ErrorsOnInvalidURL(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "update-check.json")
+
+	if err := update.Refresh(context.Background(), http.DefaultClient, "://bad", path); err == nil {
+		t.Error("expected an error for an invalid URL")
+	}
+}

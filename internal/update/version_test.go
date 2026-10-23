@@ -73,6 +73,7 @@ func TestNewer(t *testing.T) {
 		{"v0.2.0", "v0.2.1", false},
 		{"not-a-version", "v0.2.1", false},
 		{"v0.3.0", "dev", false},
+		{"v99999999999999999999.0.0", "v0.2.1", false},
 	}
 	for _, c := range cases {
 		if got := update.Newer(c.latest, c.current); got != c.want {

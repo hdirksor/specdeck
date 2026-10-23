@@ -118,3 +118,12 @@ func TestSaveState_ReportsWriteErrors(t *testing.T) {
 		t.Errorf("expected write error, got %v", err)
 	}
 }
+
+func TestSaveState_ReportsErrorWhenPathIsADirectory(t *testing.T) {
+	path := t.TempDir()
+
+	err := update.SaveState(path, update.State{})
+	if err == nil || !strings.Contains(err.Error(), "writing update-check cache") {
+		t.Errorf("expected write error, got %v", err)
+	}
+}

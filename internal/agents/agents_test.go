@@ -240,3 +240,139 @@ func TestStale_ReportsReadErrors(t *testing.T) {
 		t.Errorf("expected read error naming specify.md, got %v", err)
 	}
 }
+
+// skipIfRoot skips tests that rely on permissions, which root ignores.
+func skipIfRoot(t *testing.T) {
+	t.Helper()
+	if os.Geteuid() == 0 {
+		t.Skip("root ignores file permissions")
+	}
+}
+
+// chmod changes path's mode and restores it so the temp dir can be removed.
+func chmod(t *testing.T, path string, mode os.FileMode) {
+	t.Helper()
+	if err := os.Chmod(path, mode); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(path, 0755) })
+}
+
+func TestUpdate_ErrorsWhenCommandCannotBeWritten(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(claudeFile(dir, "specify.md"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := agents.Update(dir, []string{"claude"})
+	if err == nil || !strings.Contains(err.Error(), "writing .claude/commands/specdeck/specify.md") {
+		t.Errorf("expected write error, got %v", err)
+	}
+}
+
+func TestUpdate_ErrorsWhenCommandsDirCannotBeListed(t *testing.T) {
+	skipIfRoot(t)
+	dir := t.TempDir()
+	update(t, dir, "claude")
+	chmod(t, filepath.Dir(claudeFile(dir, "specify.md")), 0300)
+
+	_, err := agents.Update(dir, []string{"claude"})
+	if err == nil || !strings.Contains(err.Error(), "reading .claude/commands/specdeck") {
+		t.Errorf("expected listing error, got %v", err)
+	}
+}
+
+func TestUpdate_ErrorsWhenRetiredFileCannotBeRemoved(t *testing.T) {
+	skipIfRoot(t)
+	dir := t.TempDir()
+	update(t, dir, "claude")
+	writeTestFile(t, claudeFile(dir, "change.md"), "retired")
+	chmod(t, filepath.Dir(claudeFile(dir, "specify.md")), 0555)
+
+	_, err := agents.Update(dir, []string{"claude"})
+	if err == nil || !strings.Contains(err.Error(), "removing .claude/commands/specdeck/change.md") {
+		t.Errorf("expected remove error, got %v", err)
+	}
+}
+
+func TestUpdate_ErrorsWhenConfigCannotBeSaved(t *testing.T) {
+	skipIfRoot(t)
+	dir := t.TempDir()
+	update(t, dir, "claude")
+	if err := os.Remove(filepath.Join(dir, "specdeck.yml")); err != nil {
+		t.Fatal(err)
+	}
+	chmod(t, dir, 0555)
+
+	_, err := agents.Update(dir, []string{"claude"})
+	if err == nil || !strings.Contains(err.Error(), "writing specdeck.yml") {
+		t.Errorf("expected config write error, got %v", err)
+	}
+}
+
+func TestUpdate_KeepsSubfolders(t *testing.T) {
+	dir := t.TempDir()
+	update(t, dir, "claude")
+	writeTestFile(t, claudeFile(dir, filepath.Join("mine", "notes.md")), "mine")
+
+	update(t, dir)
+
+	if _, err := os.Stat(claudeFile(dir, filepath.Join("mine", "notes.md"))); err != nil {
+		t.Errorf("expected subfolder to be kept: %v", err)
+	}
+}
+
+func TestStale_IgnoresSubfolders(t *testing.T) {
+	dir := t.TempDir()
+	update(t, dir, "claude")
+	writeTestFile(t, claudeFile(dir, filepath.Join("mine", "notes.md")), "mine")
+
+	stale, err := agents.Stale(dir)
+	if err != nil {
+		t.Fatalf("Stale: %v", err)
+	}
+	if len(stale) != 0 {
+		t.Errorf("expected nothing stale, got %v", stale)
+	}
+}
+
+func TestStale_ErrorsWhenCommandsDirCannotBeListed(t *testing.T) {
+	skipIfRoot(t)
+	dir := t.TempDir()
+	update(t, dir, "claude")
+	chmod(t, filepath.Dir(claudeFile(dir, "specify.md")), 0300)
+
+	if _, err := agents.Stale(dir); err == nil || !strings.Contains(err.Error(), "reading .claude/commands/specdeck") {
+		t.Errorf("expected listing error, got %v", err)
+	}
+}
+
+func TestStale_ErrorsOnMalformedConfig(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, filepath.Join(dir, "specdeck.yml"), "agents: [unclosed")
+
+	if _, err := agents.Stale(dir); err == nil || !strings.Contains(err.Error(), "specdeck.yml") {
+		t.Errorf("expected specdeck.yml error, got %v", err)
+	}
+}
+
+func TestStale_ErrorsOnUnknownRecordedAgent(t *testing.T) {
+	dir := t.TempDir()
+	if err := config.Save(dir, config.Config{Agents: []string{"cursor"}}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := agents.Stale(dir); err == nil || !strings.Contains(err.Error(), `unknown agent "cursor"`) {
+		t.Errorf("expected unknown agent error, got %v", err)
+	}
+}
+
+func writeTestFile(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+}

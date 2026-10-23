@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"runtime/debug"
 
@@ -13,6 +14,12 @@ import (
 var version string
 
 var currentBuild = detectBuild()
+
+// Where notices and errors go; tests replace these.
+var (
+	stderr           io.Writer = os.Stderr
+	stderrIsTerminal           = func() bool { return isTerminal(os.Stderr) }
+)
 
 var rootCmd = &cobra.Command{
 	Use:           "specdeck",
@@ -29,13 +36,19 @@ func detectBuild() update.Build {
 }
 
 func Execute() {
+	os.Exit(execute())
+}
+
+// execute runs the command line, prints any notices, and returns the exit code.
+func execute() int {
 	executed, err := rootCmd.ExecuteC()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(stderr, err)
 	}
 	notifyStaleCommands(executed)
 	notifyUpdates(executed)
 	if err != nil {
-		os.Exit(1)
+		return 1
 	}
+	return 0
 }
