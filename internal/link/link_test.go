@@ -199,3 +199,15 @@ func TestSync_ErrorsWithoutSpecdeckYML(t *testing.T) {
 		t.Error("expected error when specdeck.yml is missing")
 	}
 }
+
+func TestSync_ErrorsOnMalformedSpecdeckYML(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "specdeck.yml"), []byte("specs_repo: [unclosed"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	err := link.Sync(dir)
+	if err == nil || !strings.Contains(err.Error(), "reading specdeck.yml") {
+		t.Errorf("expected specdeck.yml read error, got %v", err)
+	}
+}

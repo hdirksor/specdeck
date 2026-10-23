@@ -195,3 +195,12 @@ func TestWrite_CreatesNestedDirectories(t *testing.T) {
 		t.Errorf("expected output file to exist: %v", err)
 	}
 }
+
+func TestWrite_UntitledStateDefaultsToState(t *testing.T) {
+	got := writeOut(t, build.Container{
+		Title:  "Button",
+		States: []build.State{{Specs: build.Specs{"color": "gray"}}},
+	})
+	assertContains(t, got, "## State")
+	assertContains(t, got, "| color | gray |")
+}
