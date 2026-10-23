@@ -28,6 +28,21 @@ You will also want to run `specdeck link /path/to/spec/repo` in any repositories
 
 As a tool designed to help spec continuously developed projects it is only right to treat your spec, like your code, as a continuously developed entity. As such, Specdeck is intended to be git-dependent and the expected way to introduce a change to your specs is through a pull request or new branch. 
 
+### Images
+
+Drop an image next to a container's YAML file, matching its filename stem, and `build` embeds it at the top of that container's section and copies it alongside the generated markdown:
+
+```
+containers/
+  screen-one/
+    index.yml
+    index.png    # rendered at the top of screen-one/_index.md
+```
+
+Supported extensions: `.png`, `.jpg`, `.jpeg`, `.gif`, `.svg`, `.webp`. If more than one matches the same stem (e.g. `index.png` and `index.svg`), `build` fails with an ambiguous-image error — remove one.
+
+This only applies to a container's own file. A container embedded elsewhere via `$ref` does not carry its image into the importing container's output.
+
 ## Agentic Use
 
 If you are using Claude, running `specdeck link` will install two Claude Code commands in `.claude/commands/`:

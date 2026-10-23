@@ -37,6 +37,11 @@ func Load(root string) ([]Container, error) {
 			return fmt.Errorf("%s: %w", rel, err)
 		}
 		c.Path = rel
+		img, err := findImage(path)
+		if err != nil {
+			return fmt.Errorf("%s: %w", rel, err)
+		}
+		c.Image = img
 		containers = append(containers, c)
 		return nil
 	})

@@ -9,8 +9,6 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -24,13 +22,3 @@ jobs:
           files: coverage.out
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
-      - name: Coverage report
-        if: github.event_name == 'pull_request'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          go tool cover -func=coverage.out | tail -1
-          REPORT=$(go tool cover -func=coverage.out)
-          gh pr comment ${{ github.event.pull_request.number }} \
-            --repo ${{ github.repository }} \
-            --body "$(printf '## Coverage\n```\n%s\n```' "$REPORT")"

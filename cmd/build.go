@@ -26,7 +26,8 @@ func runBuild(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	containers, err := build.Load(filepath.Join(root, "containers"))
+	containersRoot := filepath.Join(root, "containers")
+	containers, err := build.Load(containersRoot)
 	if err != nil {
 		return fmt.Errorf("\U0001F7E5  %w", err)
 	}
@@ -35,7 +36,7 @@ func runBuild(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("\U0001F7E5  %w", err)
 	}
 
-	written, err := build.WriteDist(containers, filepath.Join(root, "dist"))
+	written, err := build.WriteDist(containers, containersRoot, filepath.Join(root, "dist"))
 	for _, path := range written {
 		fmt.Fprintf(cmd.OutOrStdout(), "\033[32m↳\033[0m  dist/%s\n", path)
 	}

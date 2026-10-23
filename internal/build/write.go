@@ -11,12 +11,16 @@ import (
 )
 
 // open/close inventory (inline {{if}}...{{end}} on one line not counted):
-//  opens:  range(outer) if(desc) if(behavior) range(behavior) if(specs) range(specs)
+//  opens:  range(outer) if(image) if(desc) if(behavior) range(behavior) if(specs) range(specs)
 //          range(states) if(desc) range(specs)
 //          if(events) range(events) range(effects)
-//  closes: end×12 — one per open above
+//  closes: end×13 — one per open above
 const markdownTmpl = `{{- range .}}
 {{.Heading}} {{.Title}}
+{{- if .Image}}
+
+![{{.Title}}]({{.Image}})
+{{- end}}
 {{- if .Description}}
 
 {{.Description}}
@@ -61,7 +65,7 @@ const markdownTmpl = `{{- range .}}
 {{- range .Events}}
 **{{.Title}}**{{if .Description}} — {{.Description}}{{end}}
 {{- range .Effects}}
-- {{.Title}}{{if .Description}}: {{.Description}}{{end}}
+- {{if .Title}}{{.Title}}{{if .Description}}: {{.Description}}{{end}}{{else}}{{.Description}}{{end}}
 {{- end}}
 
 {{- end}}
@@ -86,6 +90,7 @@ type stateSection struct {
 type renderNode struct {
 	Heading       string
 	Title         string
+	Image         string
 	Description   string
 	Behavior      []string
 	Specs         []specRow
@@ -111,6 +116,7 @@ func flattenContainer(c Container, level int) []renderNode {
 	node := renderNode{
 		Heading:       strings.Repeat("#", level),
 		Title:         c.Title,
+		Image:         imagePath(c),
 		Description:   c.Description,
 		Behavior:      c.Behavior,
 		EventsHeading: strings.Repeat("#", level+1),
@@ -141,6 +147,17 @@ func flattenContainer(c Container, level int) []renderNode {
 		nodes = append(nodes, flattenContainer(sub, level+1)...)
 	}
 	return nodes
+}
+
+// imagePath returns c's image as a site-root-relative path (e.g.
+// "/app/shared/nav-bar.png") so it resolves correctly under Hugo's
+// pretty-URL routing, which nests leaf pages one directory deeper than
+// the copied image asset. Returns "" if c has no image.
+func imagePath(c Container) string {
+	if c.Image == "" {
+		return ""
+	}
+	return "/" + filepath.ToSlash(filepath.Join(filepath.Dir(c.Path), c.Image))
 }
 
 func toSpecRows(specs Specs) []specRow {
