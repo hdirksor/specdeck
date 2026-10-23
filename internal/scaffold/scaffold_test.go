@@ -166,3 +166,16 @@ func TestNew_DoesNotWriteTOML(t *testing.T) {
 
 	assertNotExists(t, filepath.Join(dir, "specdeck.toml"))
 }
+
+func TestNew_ErrorsWhenConfigCannotBeCreated(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root ignores directory permissions")
+	}
+	dir := gitDir(t)
+	if err := os.Chmod(dir, 0555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(dir, 0755) })
+
+	assertErrorContains(t, scaffold.New(dir, "jot"), "creating specdeck.yml")
+}

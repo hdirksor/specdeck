@@ -223,3 +223,44 @@ func TestLink_OverwritesStaleSkills(t *testing.T) {
 		t.Error("expected specify.md to be overwritten on re-link")
 	}
 }
+
+func TestLink_ErrorsWhenSpecdeckYMLCannotBeChecked(t *testing.T) {
+	// A regular file where the directory should be makes Stat fail with ENOTDIR.
+	file := filepath.Join(t.TempDir(), "not-a-dir")
+	if err := os.WriteFile(file, nil, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	err := link.Link(file, "")
+	if err == nil || !strings.Contains(err.Error(), "checking specdeck.yml") {
+		t.Errorf("expected specdeck.yml check error, got %v", err)
+	}
+}
+
+func TestLink_ErrorsWhenSpecdeckYMLCannotBeCreated(t *testing.T) {
+	// A dangling symlink is reported as missing, but Create cannot follow it.
+	dir := t.TempDir()
+	if err := os.Symlink(filepath.Join(dir, "missing", "specdeck.yml"), filepath.Join(dir, "specdeck.yml")); err != nil {
+		t.Fatal(err)
+	}
+
+	err := link.Link(dir, "")
+	if err == nil || !strings.Contains(err.Error(), "creating specdeck.yml") {
+		t.Errorf("expected specdeck.yml create error, got %v", err)
+	}
+}
+
+func TestLink_ErrorsWhenCommandsDirCannotBeCreated(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "specdeck.yml"), []byte("specs_repo: \"\"\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".claude"), nil, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	err := link.Link(dir, "")
+	if err == nil || !strings.Contains(err.Error(), "creating .claude/commands/specdeck") {
+		t.Errorf("expected commands dir error, got %v", err)
+	}
+}
