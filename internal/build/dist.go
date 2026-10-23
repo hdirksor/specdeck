@@ -53,20 +53,14 @@ func WriteDist(containers []Container, containersRoot, distRoot string) ([]strin
 
 	for _, dir := range stubDirs {
 		relOut := filepath.Join(dir, "_index.md")
-		if err := writeSectionStub(filepath.Join(distRoot, relOut), dirTitle(filepath.Base(dir))); err != nil {
+		stub := fmt.Appendf(nil, "---\ntitle: %s\n---\n", dirTitle(filepath.Base(dir)))
+		if err := os.WriteFile(filepath.Join(distRoot, relOut), stub, 0644); err != nil {
 			return written, fmt.Errorf("writing section stub for %s: %w", dir, err)
 		}
 		written = append(written, filepath.ToSlash(relOut))
 	}
 
 	return written, nil
-}
-
-func writeSectionStub(path, title string) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		return fmt.Errorf("creating directory: %w", err)
-	}
-	return os.WriteFile(path, fmt.Appendf(nil, "---\ntitle: %s\n---\n", title), 0644)
 }
 
 func dirTitle(name string) string {

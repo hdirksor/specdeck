@@ -134,3 +134,38 @@ func TestWriteDist_CopiesImageNextToOutput(t *testing.T) {
 		t.Errorf("copied image: want %d bytes, got %d bytes", len(pngData), len(got))
 	}
 }
+
+func TestWriteDist_ErrorsWhenContainerCannotBeWritten(t *testing.T) {
+	distRoot := filepath.Join(t.TempDir(), "dist")
+	writeFile(t, distRoot, "not a directory")
+
+	_, err := build.WriteDist([]build.Container{{Path: "home.yml", Title: "Home"}}, t.TempDir(), distRoot)
+	if err == nil {
+		t.Fatal("expected error when distRoot is a file, got nil")
+	}
+}
+
+func TestWriteDist_ErrorsWhenImageCannotBeCopied(t *testing.T) {
+	distRoot := filepath.Join(t.TempDir(), "dist")
+	c := build.Container{Path: "home.yml", Title: "Home", Image: "home.png"}
+
+	written, err := build.WriteDist([]build.Container{c}, t.TempDir(), distRoot)
+	if err == nil {
+		t.Fatal("expected error for missing image, got nil")
+	}
+	if len(written) != 0 {
+		t.Errorf("written = %v, want none", written)
+	}
+}
+
+func TestWriteDist_ErrorsWhenSectionStubCannotBeWritten(t *testing.T) {
+	distRoot := filepath.Join(t.TempDir(), "dist")
+	if err := os.MkdirAll(filepath.Join(distRoot, "screens", "_index.md"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := build.WriteDist([]build.Container{{Path: "screens/login.yml", Title: "Login"}}, t.TempDir(), distRoot)
+	if err == nil {
+		t.Fatal("expected error when stub path is a directory, got nil")
+	}
+}

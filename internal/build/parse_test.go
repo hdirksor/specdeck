@@ -587,3 +587,16 @@ containers:
 	_, err := build.Load(dir)
 	assertErrorContains(t, err, "loading ./missing.yml")
 }
+
+func TestParseFile_EffectMappingWithInvalidFieldErrors(t *testing.T) {
+	f := writeTempFile(t, `
+title: Note Card
+events:
+  - title: delete
+    effects:
+      - title: [not, a, string]
+`)
+	if _, err := build.ParseFile(f); err == nil {
+		t.Fatal("expected error for non-string effect title, got nil")
+	}
+}

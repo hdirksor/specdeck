@@ -96,10 +96,10 @@ func resizeIfNeeded(data []byte, ext string) ([]byte, error) {
 	dstWidth, dstHeight := width, height
 	if width >= height {
 		dstWidth = maxImageDimension
-		dstHeight = height * maxImageDimension / width
+		dstHeight = max(1, height*maxImageDimension/width)
 	} else {
 		dstHeight = maxImageDimension
-		dstWidth = width * maxImageDimension / height
+		dstWidth = max(1, width*maxImageDimension/height)
 	}
 
 	dst := image.NewRGBA(image.Rect(0, 0, dstWidth, dstHeight))

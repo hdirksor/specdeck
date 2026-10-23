@@ -214,3 +214,56 @@ func TestCopyImage_CorruptPNGReturnsError(t *testing.T) {
 		t.Error("expected error decoding corrupt png, got nil")
 	}
 }
+
+func TestCopyImage_ResizesVeryWideImageToAtLeastOnePixelHigh(t *testing.T) {
+	containersRoot := t.TempDir()
+	writeFile(t, filepath.Join(containersRoot, "banner.png"), string(encodePNG(t, 2000, 1)))
+
+	c := build.Container{Path: "banner.yml", Image: "banner.png"}
+
+	outDir := t.TempDir()
+	if err := build.CopyImage(c, containersRoot, outDir); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	width, height := decodeImageDimensions(t, filepath.Join(outDir, "banner.png"))
+	if width != 800 || height != 1 {
+		t.Errorf("dimensions: want 800x1, got %dx%d", width, height)
+	}
+}
+
+func TestCopyImage_ErrorsWhenSourceMissing(t *testing.T) {
+	c := build.Container{Path: "login.yml", Image: "login.png"}
+
+	if err := build.CopyImage(c, t.TempDir(), t.TempDir()); err == nil {
+		t.Fatal("expected error for missing source image, got nil")
+	}
+}
+
+func TestCopyImage_ErrorsWhenOutDirCannotBeCreated(t *testing.T) {
+	containersRoot := t.TempDir()
+	writeFile(t, filepath.Join(containersRoot, "login.svg"), "fake-svg-bytes")
+	blocker := filepath.Join(t.TempDir(), "blocker")
+	writeFile(t, blocker, "not a directory")
+
+	c := build.Container{Path: "login.yml", Image: "login.svg"}
+
+	if err := build.CopyImage(c, containersRoot, filepath.Join(blocker, "out")); err == nil {
+		t.Fatal("expected error when outDir is under a file, got nil")
+	}
+}
+
+func TestCopyImage_ErrorsWhenDestinationIsDirectory(t *testing.T) {
+	containersRoot := t.TempDir()
+	writeFile(t, filepath.Join(containersRoot, "login.svg"), "fake-svg-bytes")
+	outDir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(outDir, "login.svg"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	c := build.Container{Path: "login.yml", Image: "login.svg"}
+
+	if err := build.CopyImage(c, containersRoot, outDir); err == nil {
+		t.Fatal("expected error when destination is a directory, got nil")
+	}
+}
