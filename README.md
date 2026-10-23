@@ -15,6 +15,12 @@ Specdeck is a command line tool written in Go to manage specs. At its core, Spec
 Specdeck can be installed by running 
 `go install github.com/hdirksor/specdeck@latest`
 
+### Update notices
+
+When a newer release is out, specdeck prints a one-line notice on stderr, at most once a day. It checks GitHub for the latest release in the background, at most once a day, so commands never wait on the network. The check is skipped in CI (when `CI` is set), when stderr is not a terminal, and for local builds. To turn it off, set `SPECDECK_NO_UPDATE_CHECK=1`.
+
+After upgrading, run `specdeck agents` in each code repo to update its agent commands. Until you do, specdeck reminds you when it runs in that repo.
+
 ## Getting Started
 
 A Specdeck project is designed to exist as a standalone git repository. To get started run `specdeck new` in a directory. This will create: 
@@ -22,7 +28,7 @@ A Specdeck project is designed to exist as a standalone git repository. To get s
 - `specdeck.yml`
 - `containers/`
 
-You will also want to run `specdeck link /path/to/spec/repo` in any repositories used to build the product being spec'd. `specdeck link` creates a `specdeck.yml` config file in your code repo and adds some agentic commands if you are using Claude.
+You will also want to run `specdeck link /path/to/spec/repo` in any repositories used to build the product being spec'd. `specdeck link` records the specs repo path in a `specdeck.yml` config file in your code repo. If you use an AI coding agent, also run `specdeck agents claude` to install specdeck's commands for it.
 
 ## Writing Specs
 
@@ -45,7 +51,7 @@ This only applies to a container's own file. A container embedded elsewhere via 
 
 ## Agentic Use
 
-If you are using Claude, running `specdeck link` will install Claude Code commands in `.claude/commands/specdeck/`:
+Running `specdeck agents claude` in a code repo installs Claude Code commands in `.claude/commands/specdeck/` and records `claude` under `agents` in `specdeck.yml`. Run `specdeck agents` with no names to update every recorded agent. specdeck owns that folder: it overwrites the files there and removes ones it no longer ships, so keep your own commands outside it.
 
 - `/specdeck:specify` — point Claude at specific code or documentation and it will draft a spec document from it.
 
@@ -56,8 +62,10 @@ Specdeck is built on a recursive type system with `Container` being the core. Ea
 ## Commands
 
 - `specdeck new [name]` — Initialise a new specdeck project in the current directory. (This is the repo where your specs will live, not your code.)
-- `specdeck link [specs-repo-path]` — Link a code repository to a specdeck specs repo. Creates `specdeck.yml` (unless it already exists) and installs Claude Code skills in the current directory. Re-run it to update skills.
+- `specdeck link <specs-repo-path>` — Link a code repository to a specdeck specs repo by recording the path in `specdeck.yml`. Re-run it to point at a different specs repo.
+- `specdeck agents [agent...]` — Install or update specdeck's commands for AI coding agents (supported: `claude`). With no names, updates every agent recorded in `specdeck.yml`.
 - `specdeck build` — Resolve container refs and write flat specs to `dist/`.
+- `specdeck --version` — Print the installed version.
 
 ## License
 

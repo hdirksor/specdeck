@@ -3,150 +3,38 @@ package link_test
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/hdirksor/specdeck/internal/config"
 	"github.com/hdirksor/specdeck/internal/link"
 )
 
-func TestLink_CreatesSpecdeckYML_WithPath(t *testing.T) {
+func loadConfig(t *testing.T, dir string) config.Config {
+	t.Helper()
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatalf("loading config: %v", err)
+	}
+	return cfg
+}
+
+func TestLink_CreatesSpecdeckYMLWithPath(t *testing.T) {
 	dir := t.TempDir()
 
 	if err := link.Link(dir, "/path/to/specs"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	data, err := os.ReadFile(filepath.Join(dir, "specdeck.yml"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !strings.Contains(string(data), "/path/to/specs") {
-		t.Errorf("specdeck.yml missing specs_repo path, got:\n%s", string(data))
+	if got := loadConfig(t, dir).SpecsRepo; got != "/path/to/specs" {
+		t.Errorf("specs_repo = %q, want /path/to/specs", got)
 	}
 }
 
-func TestLink_CreatesSpecdeckYML_WithEmptyPath(t *testing.T) {
+func TestLink_UpdatesSpecsRepoAndKeepsAgents(t *testing.T) {
 	dir := t.TempDir()
-
-	if err := link.Link(dir, ""); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if _, err := os.Stat(filepath.Join(dir, "specdeck.yml")); os.IsNotExist(err) {
-		t.Error("expected specdeck.yml to exist")
-	}
-}
-
-func TestLink_CreatesClaudeCommandsDir(t *testing.T) {
-	dir := t.TempDir()
-
-	if err := link.Link(dir, ""); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if _, err := os.Stat(filepath.Join(dir, ".claude", "commands", "specdeck")); os.IsNotExist(err) {
-		t.Error("expected .claude/commands/specdeck directory to exist")
-	}
-}
-
-func TestLink_CreatesSpecifySkill(t *testing.T) {
-	dir := t.TempDir()
-
-	if err := link.Link(dir, ""); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if _, err := os.Stat(filepath.Join(dir, ".claude", "commands", "specdeck", "specify.md")); os.IsNotExist(err) {
-		t.Error("expected .claude/commands/specdeck/specify.md to exist")
-	}
-}
-
-func TestLink_SpecifySkillReferencesSpecsRepo(t *testing.T) {
-	dir := t.TempDir()
-
-	if err := link.Link(dir, ""); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	data, err := os.ReadFile(filepath.Join(dir, ".claude", "commands", "specdeck", "specify.md"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !strings.Contains(string(data), "specdeck.yml") {
-		t.Errorf("specify.md should reference specdeck.yml, got:\n%s", string(data))
-	}
-}
-
-func TestLink_DoesNotWriteSkillsVersion(t *testing.T) {
-	dir := t.TempDir()
-
-	if err := link.Link(dir, "/some/path"); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	data, err := os.ReadFile(filepath.Join(dir, "specdeck.yml"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if strings.Contains(string(data), "skills_version") {
-		t.Errorf("specdeck.yml should not contain skills_version, got:\n%s", string(data))
-	}
-}
-
-func TestLink_SpecifySkillHasNoVersionCheck(t *testing.T) {
-	dir := t.TempDir()
-
-	if err := link.Link(dir, ""); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	data, err := os.ReadFile(filepath.Join(dir, ".claude", "commands", "specdeck", "specify.md"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if strings.Contains(string(data), "skills_version") {
-		t.Errorf("specify.md should not contain a skills_version check, got:\n%s", string(data))
-	}
-}
-
-func TestLink_InstallsSkillsOnlyUnderSpecdeckNamespace(t *testing.T) {
-	dir := t.TempDir()
-
-	if err := link.Link(dir, ""); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	entries, err := os.ReadDir(filepath.Join(dir, ".claude", "commands"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, entry := range entries {
-		if entry.Name() != "specdeck" {
-			t.Errorf("unexpected .claude/commands/%s; skills belong in .claude/commands/specdeck/", entry.Name())
-		}
-	}
-}
-
-func TestLink_DoesNotInstallChangeSkill(t *testing.T) {
-	dir := t.TempDir()
-
-	if err := link.Link(dir, ""); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if _, err := os.Stat(filepath.Join(dir, ".claude", "commands", "specdeck", "change.md")); !os.IsNotExist(err) {
-		t.Error("expected change.md not to be installed")
-	}
-}
-
-func TestLink_PreservesExistingSpecdeckYML(t *testing.T) {
-	dir := t.TempDir()
-	existing := "specs_repo: /original/specs\n"
-	if err := os.WriteFile(filepath.Join(dir, "specdeck.yml"), []byte(existing), 0644); err != nil {
+	if err := config.Save(dir, config.Config{SpecsRepo: "/original/specs", Agents: []string{"claude"}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -154,12 +42,21 @@ func TestLink_PreservesExistingSpecdeckYML(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	data, err := os.ReadFile(filepath.Join(dir, "specdeck.yml"))
-	if err != nil {
-		t.Fatal(err)
+	want := config.Config{SpecsRepo: "/new/specs", Agents: []string{"claude"}}
+	if got := loadConfig(t, dir); !reflect.DeepEqual(got, want) {
+		t.Errorf("got %+v, want %+v", got, want)
 	}
-	if string(data) != existing {
-		t.Errorf("specdeck.yml should be unchanged, got:\n%s", string(data))
+}
+
+func TestLink_DoesNotInstallAgentCommands(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := link.Link(dir, "/path/to/specs"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(dir, ".claude")); !os.IsNotExist(err) {
+		t.Error("expected link not to create .claude")
 	}
 }
 
@@ -173,94 +70,19 @@ func TestLink_IgnoresSpecdeckTOML(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	data, err := os.ReadFile(filepath.Join(dir, "specdeck.yml"))
-	if err != nil {
-		t.Fatalf("expected specdeck.yml to be created even when specdeck.toml exists: %v", err)
-	}
-	if !strings.Contains(string(data), "/new/specs") {
-		t.Errorf("specdeck.yml missing specs_repo path, got:\n%s", string(data))
+	if got := loadConfig(t, dir).SpecsRepo; got != "/new/specs" {
+		t.Errorf("specs_repo = %q, want /new/specs", got)
 	}
 }
 
-func TestLink_RewritesSkillsWhenConfigExists(t *testing.T) {
+func TestLink_ErrorsOnMalformedSpecdeckYML(t *testing.T) {
 	dir := t.TempDir()
-	if err := link.Link(dir, "/original/specs"); err != nil {
-		t.Fatalf("setup error: %v", err)
-	}
-
-	// Remove skills to simulate stale state.
-	os.Remove(filepath.Join(dir, ".claude", "commands", "specdeck", "specify.md"))
-
-	if err := link.Link(dir, ""); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if _, err := os.Stat(filepath.Join(dir, ".claude", "commands", "specdeck", "specify.md")); os.IsNotExist(err) {
-		t.Error("expected .claude/commands/specdeck/specify.md to exist after re-link")
-	}
-}
-
-func TestLink_OverwritesStaleSkills(t *testing.T) {
-	dir := t.TempDir()
-	if err := link.Link(dir, "/original/specs"); err != nil {
-		t.Fatalf("setup error: %v", err)
-	}
-
-	specifyPath := filepath.Join(dir, ".claude", "commands", "specdeck", "specify.md")
-	if err := os.WriteFile(specifyPath, []byte("stale"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "specdeck.yml"), []byte("specs_repo: [unclosed"), 0644); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := link.Link(dir, ""); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	data, err := os.ReadFile(specifyPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(data) == "stale" {
-		t.Error("expected specify.md to be overwritten on re-link")
-	}
-}
-
-func TestLink_ErrorsWhenSpecdeckYMLCannotBeChecked(t *testing.T) {
-	// A regular file where the directory should be makes Stat fail with ENOTDIR.
-	file := filepath.Join(t.TempDir(), "not-a-dir")
-	if err := os.WriteFile(file, nil, 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	err := link.Link(file, "")
-	if err == nil || !strings.Contains(err.Error(), "checking specdeck.yml") {
-		t.Errorf("expected specdeck.yml check error, got %v", err)
-	}
-}
-
-func TestLink_ErrorsWhenSpecdeckYMLCannotBeCreated(t *testing.T) {
-	// A dangling symlink is reported as missing, but Create cannot follow it.
-	dir := t.TempDir()
-	if err := os.Symlink(filepath.Join(dir, "missing", "specdeck.yml"), filepath.Join(dir, "specdeck.yml")); err != nil {
-		t.Fatal(err)
-	}
-
-	err := link.Link(dir, "")
-	if err == nil || !strings.Contains(err.Error(), "creating specdeck.yml") {
-		t.Errorf("expected specdeck.yml create error, got %v", err)
-	}
-}
-
-func TestLink_ErrorsWhenCommandsDirCannotBeCreated(t *testing.T) {
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "specdeck.yml"), []byte("specs_repo: \"\"\n"), 0644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, ".claude"), nil, 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	err := link.Link(dir, "")
-	if err == nil || !strings.Contains(err.Error(), "creating .claude/commands/specdeck") {
-		t.Errorf("expected commands dir error, got %v", err)
+	err := link.Link(dir, "/new/specs")
+	if err == nil || !strings.Contains(err.Error(), "specdeck.yml") {
+		t.Errorf("expected specdeck.yml error, got %v", err)
 	}
 }
