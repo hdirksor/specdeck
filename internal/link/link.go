@@ -9,11 +9,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const skillsVersion = 2
-
 type config struct {
-	SpecsRepo     string `yaml:"specs_repo"`
-	SkillsVersion int    `yaml:"skills_version"`
+	SpecsRepo string `yaml:"specs_repo"`
 }
 
 //go:embed skills
@@ -21,37 +18,18 @@ var skillsFS embed.FS
 
 // Link writes specdeck.yml and the Claude Code skills into dir.
 // specsPath is the local path to the specs repo; it may be empty.
+// An existing specdeck.yml is left untouched so re-running link only
+// refreshes the skills.
 func Link(dir, specsPath string) error {
-	if err := writeConfig(dir, specsPath); err != nil {
-		return err
+	_, err := os.Stat(filepath.Join(dir, "specdeck.yml"))
+	if os.IsNotExist(err) {
+		if err := writeConfig(dir, specsPath); err != nil {
+			return err
+		}
+	} else if err != nil {
+		return fmt.Errorf("checking specdeck.yml: %w", err)
 	}
 	return writeSkills(dir)
-}
-
-// Sync re-writes all Claude Code skill files to the current version without
-// changing the specs_repo path in specdeck.yml. Returns an error if
-// specdeck.yml does not exist.
-func Sync(dir string) error {
-	cfg, err := readConfig(dir)
-	if err != nil {
-		return fmt.Errorf("reading specdeck.yml: %w — run `specdeck link` first", err)
-	}
-	if err := writeConfig(dir, cfg.SpecsRepo); err != nil {
-		return err
-	}
-	return writeSkills(dir)
-}
-
-func readConfig(dir string) (config, error) {
-	data, err := os.ReadFile(filepath.Join(dir, "specdeck.yml"))
-	if err != nil {
-		return config{}, err
-	}
-	var cfg config
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return config{}, err
-	}
-	return cfg, nil
 }
 
 func writeConfig(dir, specsPath string) error {
@@ -63,7 +41,7 @@ func writeConfig(dir, specsPath string) error {
 
 	enc := yaml.NewEncoder(f)
 	enc.SetIndent(2)
-	return enc.Encode(config{SpecsRepo: specsPath, SkillsVersion: skillsVersion})
+	return enc.Encode(config{SpecsRepo: specsPath})
 }
 
 func writeSkills(dir string) error {

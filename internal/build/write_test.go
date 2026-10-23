@@ -97,7 +97,7 @@ func TestWrite_StatesWithMergedSpecs(t *testing.T) {
 		},
 	})
 	assertContains(t, got, "## Loading")
-	assertContains(t, got, "| color | blue |")    // inherited from base
+	assertContains(t, got, "| color | blue |")       // inherited from base
 	assertContains(t, got, "| label | Loading... |") // overridden by state
 }
 

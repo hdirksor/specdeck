@@ -92,4 +92,3 @@ func resolveEntry(sub Container, baseDir, root string) (Container, error) {
 	}
 	return r, nil
 }
-

@@ -10,7 +10,7 @@ import (
 var linkCmd = &cobra.Command{
 	Use:   "link [specs-repo-path]",
 	Short: "Link a code repository to a specdeck specs repo",
-	Long:  `Creates specdeck.yml and installs Claude Code skills in the current directory.`,
+	Long:  `Creates specdeck.yml (unless it already exists) and installs Claude Code skills in the current directory. Re-run to update skills.`,
 	Args:  cobra.MaximumNArgs(1),
 	RunE:  runLink,
 }

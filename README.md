@@ -19,10 +19,10 @@ Specdeck can be installed by running
 
 A Specdeck project is designed to exist as a standalone git repository. To get started run `specdeck new` in a directory. This will create: 
 
-- `specdeck.toml`
+- `specdeck.yml`
 - `containers/`
 
-You will also want to run `specdeck link /path/to/spec/repo` in any repositories used to build the product being spec'd. `specdeck link` creates a toml config file in your code repo and adds some agentic commands if you are using Claude.
+You will also want to run `specdeck link /path/to/spec/repo` in any repositories used to build the product being spec'd. `specdeck link` creates a `specdeck.yml` config file in your code repo and adds some agentic commands if you are using Claude.
 
 ## Writing Specs
 
@@ -57,12 +57,9 @@ Specdeck is built on a recursive type system with `Container` being the core. Ea
 
 ## Commands
 
-- `specdeck new [name]` — Initialise a new specdeck project in the current directory.
-- `specdeck link [specs-repo-path]` — Link a code repository to a specdeck specs repo. Creates `specdeck.yml` and installs Claude Code skills in the current directory.
+- `specdeck new [name]` — Initialise a new specdeck project in the current directory. (This is the repo where your specs will live, not your code.)
+- `specdeck link [specs-repo-path]` — Link a code repository to a specdeck specs repo. Creates `specdeck.yml` (unless it already exists) and installs Claude Code skills in the current directory. Re-run it to update skills.
 - `specdeck build` — Resolve container refs and write flat specs to `dist/`.
-- `specdeck validate` — Validate cross-references in the specdeck project.
-- `specdeck change new <title>` — Create a new change record in `changes/`.
-- `specdeck sync` — Re-write all Claude Code skill files without changing `specdeck.yml` configuration.
 
 ## License
 
