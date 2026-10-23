@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hdickson/specdeck/internal/build"
+	"github.com/hdirksor/specdeck/internal/build"
 )
 
 func readFile(t *testing.T, path string) string {
@@ -250,4 +250,13 @@ func TestWrite_CreatesNestedDirectories(t *testing.T) {
 	if _, err := os.Stat(path); err != nil {
 		t.Errorf("expected output file to exist: %v", err)
 	}
+}
+
+func TestWrite_UntitledStateDefaultsToState(t *testing.T) {
+	got := writeOut(t, build.Container{
+		Title:  "Button",
+		States: []build.State{{Specs: build.Specs{"color": "gray"}}},
+	})
+	assertContains(t, got, "## State")
+	assertContains(t, got, "| color | gray |")
 }

@@ -1,92 +1,32 @@
-# specdeck
+# Specdeck
 
-Specdeck is a tool for managing UI specs as structured YAML. It organises specs into a nestable hierarchy of **containers** — screens, components, widgets — each with behaviour notes, key-value specs, states, and events. The `build` command resolves cross-file references and writes the full spec tree to markdown.
+[![codecov](https://codecov.io/gh/hdirksor/specdeck/graph/badge.svg)](https://codecov.io/gh/hdirksor/specdeck)
 
-## Project structure
+A spec-management tool for making robust specs with minimal fuss.
 
-A specdeck project is a directory (ideally a git repo) with:
+Specdeck is designed with large-scale projects under continuous development in mind.
 
-```
-containers/     # YAML spec files
-dist/           # markdown build output (generated)
-```
+## Overview
 
-## Containers
+Specdeck is a command line tool written in Go to manage specs. At its core, Specdeck enforces an opinionated approach to writing specs. So in a sense, Specdeck is also that specific approach to writing specs. See more about this approach in [writing specs with SpecDeck.](#writing-specs)
 
-Containers are YAML files in `containers/`. They mirror your application's component hierarchy and can be nested arbitrarily deep via directory structure or inline definitions.
+## Installation:
 
-```
-containers/
-  screen-one/
-    index.yml           # screen-level container
-    entity.yml
-    text-fiel.yml
-  shared/
-    nav-bar.yml
-    card.yml
-```
+Specdeck can be installed by running 
+`go install github.com/hdirksor/specdeck@latest`
 
-### Schema
+## Getting Started
 
-```yaml
-title: List
-description: Optional — one sentence summary.
+A Specdeck project is designed to exist as a standalone git repository. To get started run `specdeck new` in a directory. This will create: 
 
-behavior:
-  - scrollable vertically
-  - shows zero state when empty
+- `specdeck.toml`
+- `containers/`
 
-specs:
-  border: 2px white
-  content-padding: 16px
-  scroll-direction: vertical
+You will also want to run `specdeck link /path/to/spec/repo` in any repositories used to build the product being spec'd. `specdeck link` creates a toml config file in your code repo and adds some agentic commands if you are using Claude.
 
-states:
-  - title: Loading
-    description: Shown while the initial fetch is in progress.
-    specs:
-      content-padding: 0dp   # overrides base spec for this state
+## Writing Specs
 
-events:
-  - title: submit
-    description: Emitted by the submit button when input is not blank.
-    effects:
-      - title: save note
-        description: Persist the trimmed input text.
-      - title: clear input
-
-containers:
-  - $ref: ../shared/nav-bar.yml
-  - $ref: ./note-card.yml
-    overrides:
-      border: none
-  - title: Inline sub-container
-    specs:
-      label: inline
-```
-
-**`specs`** are flat key-value pairs. Values are strings.
-
-**`states`** each carry their own `specs` that override the container's base specs for that state. A state with no specs of its own inherits the base specs unchanged.
-
-**`events`** describe interactions. Each event has a `title`, optional `description`, and a list of `effects` (each with `title` and optional `description`).
-
-**`containers`** can be `$ref` imports, inline definitions, or a mix. `$ref` entries accept an optional `overrides:` map to patch individual specs in the imported container.
-
-### Cross-file references
-
-Any container can import another with `$ref`:
-
-```yaml
-containers:
-  - $ref: ../shared/nav-bar.yml
-```
-
-Paths are relative to the current file. `build` resolves all refs recursively before writing output.
-
-### `index.yml`
-
-A directory that also carries specs of its own uses an `index.yml` file. In the built output this becomes `_index.md` (Hugo section page).
+As a tool designed to help spec continuously developed projects it is only right to treat your spec, like your code, as a continuously developed entity. As such, Specdeck is intended to be git-dependent and the expected way to introduce a change to your specs is through a pull request or new branch. 
 
 ### Images
 
@@ -103,30 +43,27 @@ Supported extensions: `.png`, `.jpg`, `.jpeg`, `.gif`, `.svg`, `.webp`. If more 
 
 This only applies to a container's own file. A container embedded elsewhere via `$ref` does not carry its image into the importing container's output.
 
-## Command Line and Agentic Use
+## Agentic Use
 
-### `specdeck new [name]`
+If you are using Claude, running `specdeck link` will install two Claude Code commands in `.claude/commands/`:
 
-Initialise a new specdeck project in the current directory. Infers the project name from the directory if not provided.
+- `/specify` — point Claude at specific code or documentation and it will draft a spec document from it.
 
-### `specdeck build`
+- `/change` — create a new change record for a spec change, and have Claude fill it in from context.
 
-Resolve all `$ref` entries and write each container to `dist/` as markdown. Leaf containers become `<name>.md`; directories with `index.yml` become `_index.md`.
+## Types
 
-```
-🟢  dist/screen-one/index.md
-🟢  dist/screen-one/list.md
-🟢  dist/shared/nav-bar.md
-```
+Specdeck is built on a recursive type system with `Container` being the core. Each container may have many or no child `Containers`.
 
-### `specdeck link [specs-repo-path]`
+## Commands
 
-Run this in a **code repository** to link it to a specdeck specs repo. Creates `specdeck.yml` and installs Claude Code skills under `.claude/commands/` so Claude has context about the spec structure.
+- `specdeck new [name]` — Initialise a new specdeck project in the current directory.
+- `specdeck link [specs-repo-path]` — Link a code repository to a specdeck specs repo. Creates `specdeck.yml` and installs Claude Code skills in the current directory.
+- `specdeck build` — Resolve container refs and write flat specs to `dist/`.
+- `specdeck validate` — Validate cross-references in the specdeck project.
+- `specdeck change new <title>` — Create a new change record in `changes/`.
+- `specdeck sync` — Re-write all Claude Code skill files without changing `specdeck.yml` configuration.
 
-```sh
-specdeck link ../my-app-specs
-```
+## License
 
-### `specdeck sync`
-
-Re-writes the Claude Code skill files to the current specdeck version without changing `specdeck.yml`. Run this after upgrading specdeck.
+MIT

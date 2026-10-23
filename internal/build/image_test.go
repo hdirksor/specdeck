@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/hdickson/specdeck/internal/build"
+	"github.com/hdirksor/specdeck/internal/build"
 )
 
 // -- image test helpers --

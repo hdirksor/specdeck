@@ -3,7 +3,7 @@ package cmd
 import (
 	"os"
 
-	"github.com/hdickson/specdeck/internal/link"
+	"github.com/hdirksor/specdeck/internal/link"
 	"github.com/spf13/cobra"
 )
 
