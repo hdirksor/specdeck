@@ -3,6 +3,7 @@ package build_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/hdirksor/specdeck/internal/build"
@@ -31,6 +32,16 @@ func writeTempFile(t *testing.T, content string) string {
 	}
 	f.Close()
 	return f.Name()
+}
+
+func assertErrorContains(t *testing.T, err error, want string) {
+	t.Helper()
+	if err == nil {
+		t.Fatalf("expected error containing %q, got nil", want)
+	}
+	if !strings.Contains(err.Error(), want) {
+		t.Errorf("error = %q, want it to contain %q", err, want)
+	}
 }
 
 // -- ParseFile --
@@ -359,4 +370,113 @@ containers:
 	if nav.Path != filepath.Join("shared", "nav.yml") {
 		t.Errorf("ref path: want %q, got %q", filepath.Join("shared", "nav.yml"), nav.Path)
 	}
+}
+
+func TestLoad_InlineContainerResolvesNestedRef(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "shared", "icon.yml"), `title: Icon`)
+	writeFile(t, filepath.Join(dir, "screen.yml"), `
+title: Screen
+containers:
+  - title: Toolbar
+    containers:
+      - $ref: ./shared/icon.yml
+`)
+
+	containers, err := build.Load(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	toolbar := containers[0].Containers[0]
+	if toolbar.Title != "Toolbar" {
+		t.Fatalf("inline title: want %q, got %q", "Toolbar", toolbar.Title)
+	}
+	if len(toolbar.Containers) != 1 || toolbar.Containers[0].Title != "Icon" {
+		t.Errorf("inline container ref not resolved, got %+v", toolbar.Containers)
+	}
+}
+
+func TestLoad_OverridesOnRefWithoutSpecs(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "divider.yml"), `title: Divider`)
+	writeFile(t, filepath.Join(dir, "screen.yml"), `
+title: Screen
+containers:
+  - $ref: ./divider.yml
+    overrides:
+      color: gray
+`)
+
+	containers, err := build.Load(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var screen build.Container
+	for _, c := range containers {
+		if c.Title == "Screen" {
+			screen = c
+		}
+	}
+	if got := screen.Containers[0].Specs["color"]; got != "gray" {
+		t.Errorf("override color: want %q, got %q", "gray", got)
+	}
+}
+
+func TestLoad_MissingRoot(t *testing.T) {
+	_, err := build.Load(filepath.Join(t.TempDir(), "containers"))
+	if err == nil {
+		t.Fatal("expected error for missing root, got nil")
+	}
+}
+
+func TestLoad_InvalidYAMLNamesFile(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "screens", "bad.yml"), `title: [unclosed`)
+
+	_, err := build.Load(dir)
+	assertErrorContains(t, err, filepath.Join("screens", "bad.yml"))
+}
+
+func TestLoad_MissingRefNamesRef(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "screen.yml"), `
+title: Screen
+containers:
+  - $ref: ./missing.yml
+`)
+
+	_, err := build.Load(dir)
+	assertErrorContains(t, err, "screen.yml")
+	assertErrorContains(t, err, "loading ./missing.yml")
+}
+
+func TestLoad_InvalidYAMLInRefNamesRef(t *testing.T) {
+	dir := t.TempDir()
+	// Load walks files in lexical order; name the referrer so it is visited first.
+	writeFile(t, filepath.Join(dir, "a-screen.yml"), `
+title: Screen
+containers:
+  - $ref: ./z-broken.yml
+`)
+	writeFile(t, filepath.Join(dir, "z-broken.yml"), `title: [unclosed`)
+
+	_, err := build.Load(dir)
+	assertErrorContains(t, err, "a-screen.yml")
+	assertErrorContains(t, err, "loading ./z-broken.yml")
+}
+
+func TestLoad_MissingRefInsideInlineContainer(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "screen.yml"), `
+title: Screen
+containers:
+  - title: Toolbar
+    containers:
+      - $ref: ./missing.yml
+`)
+
+	_, err := build.Load(dir)
+	assertErrorContains(t, err, "loading ./missing.yml")
 }
