@@ -45,11 +45,9 @@ This only applies to a container's own file. A container embedded elsewhere via 
 
 ## Agentic Use
 
-If you are using Claude, running `specdeck link` will install two Claude Code commands in `.claude/commands/`:
+If you are using Claude, running `specdeck link` will install Claude Code commands in `.claude/commands/specdeck/`:
 
-- `/specify` — point Claude at specific code or documentation and it will draft a spec document from it.
-
-- `/change` — create a new change record for a spec change, and have Claude fill it in from context.
+- `/specdeck:specify` — point Claude at specific code or documentation and it will draft a spec document from it.
 
 ## Types
 

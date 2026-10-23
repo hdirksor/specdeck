@@ -45,9 +45,9 @@ func writeConfig(dir, specsPath string) error {
 }
 
 func writeSkills(dir string) error {
-	commandsDir := filepath.Join(dir, ".claude", "commands")
+	commandsDir := filepath.Join(dir, ".claude", "commands", "specdeck")
 	if err := os.MkdirAll(commandsDir, 0755); err != nil {
-		return fmt.Errorf("creating .claude/commands: %w", err)
+		return fmt.Errorf("creating .claude/commands/specdeck: %w", err)
 	}
 
 	entries, err := skillsFS.ReadDir("skills")

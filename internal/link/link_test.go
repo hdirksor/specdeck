@@ -45,8 +45,8 @@ func TestLink_CreatesClaudeCommandsDir(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if _, err := os.Stat(filepath.Join(dir, ".claude", "commands")); os.IsNotExist(err) {
-		t.Error("expected .claude/commands directory to exist")
+	if _, err := os.Stat(filepath.Join(dir, ".claude", "commands", "specdeck")); os.IsNotExist(err) {
+		t.Error("expected .claude/commands/specdeck directory to exist")
 	}
 }
 
@@ -57,8 +57,8 @@ func TestLink_CreatesSpecifySkill(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if _, err := os.Stat(filepath.Join(dir, ".claude", "commands", "specify.md")); os.IsNotExist(err) {
-		t.Error("expected .claude/commands/specify.md to exist")
+	if _, err := os.Stat(filepath.Join(dir, ".claude", "commands", "specdeck", "specify.md")); os.IsNotExist(err) {
+		t.Error("expected .claude/commands/specdeck/specify.md to exist")
 	}
 }
 
@@ -69,7 +69,7 @@ func TestLink_SpecifySkillReferencesSpecsRepo(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	data, err := os.ReadFile(filepath.Join(dir, ".claude", "commands", "specify.md"))
+	data, err := os.ReadFile(filepath.Join(dir, ".claude", "commands", "specdeck", "specify.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,18 +96,6 @@ func TestLink_DoesNotWriteSkillsVersion(t *testing.T) {
 	}
 }
 
-func TestLink_CreatesChangeSkill(t *testing.T) {
-	dir := t.TempDir()
-
-	if err := link.Link(dir, ""); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if _, err := os.Stat(filepath.Join(dir, ".claude", "commands", "change.md")); os.IsNotExist(err) {
-		t.Error("expected .claude/commands/change.md to exist")
-	}
-}
-
 func TestLink_SpecifySkillHasNoVersionCheck(t *testing.T) {
 	dir := t.TempDir()
 
@@ -115,13 +103,43 @@ func TestLink_SpecifySkillHasNoVersionCheck(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	data, err := os.ReadFile(filepath.Join(dir, ".claude", "commands", "specify.md"))
+	data, err := os.ReadFile(filepath.Join(dir, ".claude", "commands", "specdeck", "specify.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if strings.Contains(string(data), "skills_version") {
 		t.Errorf("specify.md should not contain a skills_version check, got:\n%s", string(data))
+	}
+}
+
+func TestLink_InstallsSkillsOnlyUnderSpecdeckNamespace(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := link.Link(dir, ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	entries, err := os.ReadDir(filepath.Join(dir, ".claude", "commands"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if entry.Name() != "specdeck" {
+			t.Errorf("unexpected .claude/commands/%s; skills belong in .claude/commands/specdeck/", entry.Name())
+		}
+	}
+}
+
+func TestLink_DoesNotInstallChangeSkill(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := link.Link(dir, ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(dir, ".claude", "commands", "specdeck", "change.md")); !os.IsNotExist(err) {
+		t.Error("expected change.md not to be installed")
 	}
 }
 
@@ -171,17 +189,14 @@ func TestLink_RewritesSkillsWhenConfigExists(t *testing.T) {
 	}
 
 	// Remove skills to simulate stale state.
-	os.Remove(filepath.Join(dir, ".claude", "commands", "specify.md"))
-	os.Remove(filepath.Join(dir, ".claude", "commands", "change.md"))
+	os.Remove(filepath.Join(dir, ".claude", "commands", "specdeck", "specify.md"))
 
 	if err := link.Link(dir, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	for _, skill := range []string{"specify.md", "change.md"} {
-		if _, err := os.Stat(filepath.Join(dir, ".claude", "commands", skill)); os.IsNotExist(err) {
-			t.Errorf("expected .claude/commands/%s to exist after re-link", skill)
-		}
+	if _, err := os.Stat(filepath.Join(dir, ".claude", "commands", "specdeck", "specify.md")); os.IsNotExist(err) {
+		t.Error("expected .claude/commands/specdeck/specify.md to exist after re-link")
 	}
 }
 
@@ -191,7 +206,7 @@ func TestLink_OverwritesStaleSkills(t *testing.T) {
 		t.Fatalf("setup error: %v", err)
 	}
 
-	specifyPath := filepath.Join(dir, ".claude", "commands", "specify.md")
+	specifyPath := filepath.Join(dir, ".claude", "commands", "specdeck", "specify.md")
 	if err := os.WriteFile(specifyPath, []byte("stale"), 0644); err != nil {
 		t.Fatal(err)
 	}

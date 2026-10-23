@@ -100,7 +100,7 @@ func TestLink_WritesConfigAndSkills(t *testing.T) {
 		t.Fatalf("link: %v", err)
 	}
 	assertContains(t, readFile(t, filepath.Join(dir, "specdeck.yml")), "specs_repo: ../specs")
-	if _, err := os.Stat(filepath.Join(dir, ".claude", "commands", "specify.md")); err != nil {
+	if _, err := os.Stat(filepath.Join(dir, ".claude", "commands", "specdeck", "specify.md")); err != nil {
 		t.Errorf("expected specify skill: %v", err)
 	}
 }
